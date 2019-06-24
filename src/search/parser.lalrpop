@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+use crate::signaldb::SignalValue;
+use search::expr::{ExprAst, ValueAst};
+use std::str::FromStr;
+
+grammar;
+
+pub Expr: ExprAst = {
+    <le:Expr> "or" <re:ExprTier> =>
+        ExprAst::Or(Box::new(le), Box::new(re)),
+    ExprTier
+}
+
+ExprTier: ExprAst = {
+    <le:ExprTier> "and" <re:ExprTerm> =>
+        ExprAst::And(Box::new(le), Box::new(re)),
+    <le:ExprTier> "nand" <re:ExprTerm> =>
+        ExprAst::Not(Box::new(
+            ExprAst::And(Box::new(le), Box::new(re))
+        )),
+    ExprTerm
+}
+
+ExprTerm: ExprAst = {
+    <id:LeftValue> Equal <v:RightValue> => ExprAst::Equal(id, v),
+    <id:LeftValue> NotEqual <v:RightValue> =>
+        ExprAst::Not(Box::new(ExprAst::Equal(id, v))),
+    <id:LeftValue> Transition <v:RightValue> => ExprAst::Transition(id, v),
+    "after" <i:DEC_VALUE> => ExprAst::After(i.parse().unwrap()),
+    "before" <i:DEC_VALUE> => ExprAst::Before(i.parse().unwrap()),
+    <id:LeftValue> => ExprAst::AnyTransition(id),
+    "(" <e:Expr> ")" => e,
+}
+
+Equal = {"is", "equals", "=" }
+NotEqual = {"is not", "!=" }
+Transition = {"becomes", "<-" }
+
+LeftValue: String = {
+    Id
+}
+
+RightValue: ValueAst = {
+    <v:LiteralValue> => ValueAst::Literal(v),
+    <v:LeftValue> => ValueAst::Id(v),
+    "(" <v:RightValue> ")" => v
+}
+
+Id: String = ID => <>[1..].to_string();
+
+LiteralValue: SignalValue = {
+    DEC_VALUE => SignalValue::new(<>.parse().unwrap()),
+    BIN_VALUE => SignalValue::from_str(&<>[1..]).unwrap()
+}
+
+match {
+    r"b[01uzw-]+" => BIN_VALUE,
+    r"\$[[:graph:]]+" => ID
+} else {
+    r"[0-9]+" => DEC_VALUE,
+    _
+}

@@ -1,0 +1,32 @@
+[package]
+name = "dwfv"
+version = "0.1.0"
+description = "A simple digital waveform viewer with vi-like key bindings"
+authors = ["Pierre Surply <pierre.surply@lse.epita.fr>"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/psurply/dwfv"
+
+keywords = ["vcd"]
+categories = [
+    "command-line-utilities",
+    "development-tools::debugging",
+    "embedded",
+    "parsing",
+    "visualization"
+]
+
+exclude = [
+    "examples"
+]
+
+[build-dependencies]
+lalrpop = "0"
+
+[dependencies]
+clap = "2"
+lalrpop-util = "0"
+lazy_static = "1"
+regex = "1"
+tui = "0.5"
+termion = "1.5"
