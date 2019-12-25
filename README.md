@@ -1,6 +1,10 @@
 DWFV
 ====
 
+[![Build Status](https://travis-ci.com/psurply/dwfv.svg?branch=master)](https://travis-ci.com/psurply/dwfv)
+[![Crates.io](https://img.shields.io/crates/v/dwfv)](https://crates.io/crates/dwfv)
+[![Docs Status](https://docs.rs/dwfv/badge.svg)](https://docs.rs/crate/dwfv/)
+
 A simple digital waveform viewer with vi-like key bindings.
 
 ```shell

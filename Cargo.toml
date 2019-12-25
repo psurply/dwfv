@@ -7,7 +7,7 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/psurply/dwfv"
 
-keywords = ["vcd"]
+keywords = ["eda", "vcd"]
 categories = [
     "command-line-utilities",
     "development-tools::debugging",
@@ -19,6 +19,9 @@ categories = [
 exclude = [
     "examples"
 ]
+
+[badges]
+travis-ci = { repository = "psurply/dwfv" }
 
 [build-dependencies]
 lalrpop = "0"
