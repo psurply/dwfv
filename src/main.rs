@@ -70,11 +70,11 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("at")
-                .about("Diplays states of the signals at a given timestamp")
+                .about("Displays states of the signals at a given timestamp")
                 .arg(Arg::with_name("TIMESTAMP").required(true)))
         .subcommand(
             SubCommand::with_name("when")
-                .about("Diplays the time periods when the specified expression is true")
+                .about("Displays the time periods when the specified expression is true")
                 .arg(Arg::with_name("EXPR").required(true)))
         .get_matches();
 

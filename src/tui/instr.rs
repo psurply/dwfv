@@ -6,7 +6,7 @@ use std::io::prelude::*;
 /// TUI Instruction
 #[derive(Clone)]
 pub enum TuiInstr {
-    /// Tell the TUI to display signal.
+    /// Tell the TUI to display a signal.
     Signal(String),
     /// Tell the TUI to display the result of a search expression.
     Search(String),

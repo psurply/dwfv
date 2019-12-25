@@ -23,6 +23,10 @@ is also exposed and can be used independently of the TUI.
 Installation
 ------------
 
+```shell
+$ cargo dwfv
+```
+
 From sources:
 
 ```shell
