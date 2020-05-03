@@ -24,7 +24,7 @@ exclude = [
 travis-ci = { repository = "psurply/dwfv" }
 
 [build-dependencies]
-lalrpop = "0"
+lalrpop = { version = "0", features = ["lexer"] }
 
 [dependencies]
 clap = "2"
