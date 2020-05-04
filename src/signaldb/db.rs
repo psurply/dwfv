@@ -403,7 +403,7 @@ impl SignalDB {
     }
 
     /// Set status message of the `SignalDB`.
-    /// 
+    ///
     /// # Example
     ///
     /// ```
@@ -426,7 +426,7 @@ impl SignalDB {
     }
 
     /// Create a scope in the `SignalDB`.
-    /// 
+    ///
     /// # Example
     ///
     /// ```
@@ -441,7 +441,7 @@ impl SignalDB {
     }
 
     /// Add a new signal in the ``SignalDB``.
-    /// 
+    ///
     /// # Example
     ///
     /// ```
@@ -470,7 +470,7 @@ impl SignalDB {
     }
 
     /// Insert an event in the specified signal.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -501,7 +501,7 @@ impl SignalDB {
     }
 
     /// Set the current time of the `SignalDB`
-    /// 
+    ///
     /// # Example
     ///
     /// ```
@@ -519,7 +519,7 @@ impl SignalDB {
     }
 
     /// Set the value of a signal at the current time.
-    /// 
+    ///
     /// # Example
     ///
     /// ```

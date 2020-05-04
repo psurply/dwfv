@@ -35,7 +35,7 @@ impl AsyncSignalDB {
     }
 
     /// Populate the `SignalDB` using a Value Change Dump (VCD) file in a separate thread.
-    /// 
+    ///
     /// # Example
     ///
     /// ```
@@ -64,7 +64,7 @@ impl AsyncSignalDB {
     }
 
     /// Search in the `SignalDB` in a separate thread.
-    /// 
+    ///
     /// # Example
     ///
     /// ```
