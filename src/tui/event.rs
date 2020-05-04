@@ -15,6 +15,7 @@ pub enum Event {
     Down,
     ZoomIn,
     ZoomOut,
+    ZoomFit,
     CenterWindow,
     GotoTop,
     GotoLast,
@@ -84,7 +85,7 @@ impl Events {
         self.buffer.clear()
     }
 
-    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 29] = [
+    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 31] = [
         ("j", &|_| Event::Down),
         ("k", &|_| Event::Up),
         ("l", &|_| Event::Right),
@@ -92,8 +93,10 @@ impl Events {
         ("q", &|_| Event::Quit),
         ("-", &|_| Event::ZoomOut),
         ("+", &|_| Event::ZoomIn),
+        ("=", &|_| Event::ZoomFit),
         ("zo", &|_| Event::ZoomOut),
         ("zi", &|_| Event::ZoomIn),
+        ("zc", &|_| Event::ZoomFit),
         ("w", &|_| Event::GotoNextRisingEdge),
         ("b", &|_| Event::GotoPreviousRisingEdge),
         ("e", &|_| Event::GotoNextFallingEdge),

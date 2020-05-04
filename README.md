@@ -57,8 +57,9 @@ Key Bindings
 
 ### Frame
 
-- `zi`: zoom in
-- `zo`: zoom out
+- `zi`/`+`: zoom in
+- `zo`/`-`: zoom out
+- `zc`/`=`: zoom fit
 - `zz`: center cursor on screen
 
 ### Editing

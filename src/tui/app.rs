@@ -310,6 +310,23 @@ impl App {
         self.adjust_window()
     }
 
+    fn set_cursor_horizontal(&mut self, x: u16) {
+        let offset = Timestamp::new((x - 1) as i64 * self.scale.get_value());
+        self.cursor.x = self.window.x + offset;
+
+    }
+
+    fn set_cursor_vertical(&mut self, y: u16) {
+        let mut height: usize = 0;
+        for (i, instr) in self.layout[self.window.y..].iter().enumerate() {
+            if (y as usize) >= height && (y as usize) <= height + instr.height() + 1 {
+                self.cursor.y = i;
+                break
+            }
+            height += instr.height()
+        }
+    }
+
     pub fn render<B: Backend>(&mut self, f: &mut Frame<B>) {
         if self.cursor.y >= self.layout.len() {
             self.cursor.y = self.layout.len() - 1
@@ -506,6 +523,39 @@ impl App {
         }
     }
 
+    fn zoom_fit(&mut self) {
+        let period = match &self.layout[self.cursor.y] {
+            TuiInstr::Signal(id) => Some((
+                self.signaldb.sync_db.get_first_event(&id).unwrap_or(None),
+                self.signaldb.sync_db.get_last_event(&id).unwrap_or(None)
+            )),
+            TuiInstr::Search(expr) => Some((
+                self.signaldb.sync_db.get_first_finding(&expr).unwrap_or(None),
+                self.signaldb.sync_db.get_last_finding(&expr).unwrap_or(None)
+            )),
+            _ => None
+        };
+
+        match period {
+            Some((Some(first_event), Some(last_event))) => {
+                let begin = first_event.get_value();
+                let end = last_event.get_value();
+
+                let scale = (end - begin) / self.area.width as i64;
+                if scale >= 1 {
+                    self.scale = Timestamp::new(scale);
+                    self.window.x = Timestamp::new(begin);
+                    if self.cursor.x < first_event {
+                        self.cursor.x = first_event;
+                    } else if last_event < self.cursor.x {
+                        self.cursor.x = last_event;
+                    }
+                }
+            },
+            _ => ()
+        }
+    }
+
     fn matches_search_pattern(&self, instr: &TuiInstr) -> bool {
         let id = match instr {
             TuiInstr::Signal(id) => self.signaldb.sync_db.get_signal_fullname(id).unwrap(),
@@ -588,7 +638,8 @@ impl App {
                     };
                     self.scale = Timestamp::new(scale);
                     self.center_window()
-                }
+                },
+                Event::ZoomFit => self.zoom_fit(),
                 Event::CenterWindow => {
                     self.center_window();
                     self.center_window_vertical()
