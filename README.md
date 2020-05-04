@@ -81,6 +81,14 @@ Key Bindings
 - `v`: start visual mode
 - `<enter>`: zoom fit the selected time frame
 
+### Mouse
+
+- Left click: move cursor
+- Right click: zoom out
+- Wheel up: zoom in
+- Wheel down: zoom out
+- Hold/release left click: zoom fit the selected time frame
+
 Command-Line Interface
 ----------------------
 

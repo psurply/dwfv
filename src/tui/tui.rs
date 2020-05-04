@@ -4,13 +4,14 @@ use std::error::Error;
 use std::io;
 use std::path::Path;
 use super::app::App;
-use termion::raw::IntoRawMode;
+use termion::input::MouseTerminal;
+use termion::raw::{IntoRawMode, RawTerminal};
 use tuirs::backend::TermionBackend;
 use tuirs::Terminal;
 
 /// Digital Waveform Viewer Text User Interface
 pub struct Tui {
-    term: Terminal<TermionBackend<termion::raw::RawTerminal<io::Stdout>>>,
+    term: Terminal<TermionBackend<MouseTerminal<RawTerminal<io::Stdout>>>>,
     app: App,
 }
 
@@ -25,7 +26,7 @@ impl Tui {
     /// let tui = Tui::new(AsyncSignalDB::new());
     /// ```
     pub fn new(signaldb: AsyncSignalDB) -> Result<Tui, Box<dyn Error>> {
-        let stdout = io::stdout().into_raw_mode()?;
+        let stdout = MouseTerminal::from(io::stdout().into_raw_mode()?);
         let backend = TermionBackend::new(stdout);
         let term = Terminal::new(backend)?;
         Ok(Tui {

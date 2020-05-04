@@ -2,8 +2,9 @@
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io;
-use termion::event::Key;
+use termion::event::{Key, MouseEvent, MouseButton};
 use termion::input::TermRead;
+use termion::event::Event as RawEvent;
 
 #[derive(Clone)]
 pub enum Event {
@@ -37,7 +38,9 @@ pub enum Event {
     Delete,
     Search(String),
     SearchNext,
-    SearchPrev
+    SearchPrev,
+    SetCursorVertical(u16),
+    SetCursorHorizontal(u16)
 }
 
 pub enum InputMode {
@@ -183,10 +186,10 @@ impl Events {
     }
 
     pub fn update(&mut self) {
-        let evt = io::stdin().keys().next();
-        if let Some(key) = evt {
-            if let Ok(key) = key {
-                match key {
+        let evt = io::stdin().events().next();
+        if let Some(Ok(evt)) = evt {
+            match evt {
+                RawEvent::Key(key) => match key {
                     Key::Up => {
                         self.events.push_back(Event::Up);
                         self.clear_buffer()
@@ -242,7 +245,47 @@ impl Events {
                         }
                     }
                     _ => {}
-                }
+                },
+                RawEvent::Mouse(m) => {
+                    match m {
+                        MouseEvent::Press(button, x, y) => {
+                            match button {
+                                MouseButton::WheelUp => {
+                                    self.events.push_back(Event::ZoomIn);
+                                    self.clear_buffer()
+                                },
+                                MouseButton::WheelDown | MouseButton::Right => {
+                                    self.events.push_back(Event::ZoomOut);
+                                    self.clear_buffer()
+                                },
+                                MouseButton::Left => {
+                                    self.events.push_back(Event::SetCursorHorizontal(x));
+                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.clear_buffer()
+                                },
+                                _ => {}
+                            }
+                        },
+                        MouseEvent::Release(x, _) => {
+                            if let InputMode::Visual = self.mode {
+                                self.mode = InputMode::Command;
+                                self.events.push_back(Event::SetCursorHorizontal(x));
+                                self.events.push_back(Event::FitToSelection);
+                                self.clear_buffer()
+                            }
+                        },
+                        MouseEvent::Hold(x, _) => {
+                            if let InputMode::Visual = self.mode {
+                            } else {
+                                self.mode = InputMode::Visual;
+                                self.events.push_back(Event::StartVisualMode);
+                            }
+                            self.events.push_back(Event::SetCursorHorizontal(x));
+                            self.clear_buffer()
+                        }
+                    }
+                },
+                _ => {}
             }
         }
         if let InputMode::Search = self.mode {

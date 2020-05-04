@@ -318,12 +318,16 @@ impl App {
 
     fn set_cursor_vertical(&mut self, y: u16) {
         let mut height: usize = 0;
-        for (i, instr) in self.layout[self.window.y..].iter().enumerate() {
-            if (y as usize) >= height && (y as usize) <= height + instr.height() + 1 {
-                self.cursor.y = i;
-                break
+        if y == 0 {
+            self.up()
+        } else {
+            for (i, instr) in self.layout[self.window.y..].iter().enumerate() {
+                if (y as usize) >= height && (y as usize) <= height + instr.height() + 1 {
+                    self.cursor.y = i + self.window.y;
+                    break
+                }
+                height += instr.height()
             }
-            height += instr.height()
         }
     }
 
@@ -593,6 +597,27 @@ impl App {
         }
     }
 
+    fn up(&mut self) {
+        if self.cursor.y > 0 {
+            self.cursor.y -= 1
+        } else {
+            self.set_status("Reached first signal")
+        }
+    }
+
+    fn down(&mut self) {
+        self.cursor.y += 1
+    }
+
+    fn show_clipboard(&mut self) {
+        let mut s = String::new();
+        for element in self.clipboard.iter().rev() {
+            s.push_str(&format!("{}, ", element))
+        }
+        s.push_str("EOS");
+        self.set_status(&s);
+    }
+
     pub fn update(&mut self) -> bool {
         self.events.update();
         loop {
@@ -606,12 +631,8 @@ impl App {
                 Event::Right => {
                     self.cursor.x += self.scale;
                 }
-                Event::Up => {
-                    if self.cursor.y > 0 {
-                        self.cursor.y -= 1
-                    }
-                }
-                Event::Down => self.cursor.y += 1,
+                Event::Up => self.up(),
+                Event::Down => self.down(),
                 Event::PageUp => {
                     let height = self.get_current_instr_height();
                     if self.cursor.y > height {
@@ -659,7 +680,7 @@ impl App {
                     if self.layout.len() > 1 {
                         self.clipboard = Some(self.layout.remove(self.cursor.y))
                     }
-               },
+                },
                 Event::Yank => {
                     self.clipboard = Some(self.layout[self.cursor.y].clone())
                 },
@@ -680,6 +701,8 @@ impl App {
                 },
                 Event::SearchNext => self.search_next(),
                 Event::SearchPrev => self.search_prev(),
+                Event::SetCursorVertical(x) => self.set_cursor_vertical(x),
+                Event::SetCursorHorizontal(y) => self.set_cursor_horizontal(y),
                 _ => (),
             }
         }
