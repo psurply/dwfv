@@ -50,11 +50,13 @@ Id: String = ID => <>[1..].to_string();
 
 LiteralValue: SignalValue = {
     DEC_VALUE => SignalValue::new(<>.parse().unwrap()),
-    BIN_VALUE => SignalValue::from_str(&<>[1..]).unwrap()
+    BIN_VALUE => SignalValue::from_str(&<>[1..]).unwrap(),
+    HEX_VALUE => SignalValue::from_hex(&<>[1..])
 }
 
 match {
     r"b[01uzw-]+" => BIN_VALUE,
+    r"h[0-9A-Fa-f]+" => HEX_VALUE,
     r"\$[[:graph:]]+" => ID
 } else {
     r"[0-9]+" => DEC_VALUE,

@@ -34,7 +34,7 @@ pub enum SignalValue {
 
 impl BitValue {
     /// Create a `BitValue` from a `char`.
-    /// 
+    ///
     /// Example:
     ///
     /// ```
@@ -172,6 +172,26 @@ impl SignalValue {
     /// ```
     pub fn from_symbol_str(s: &str) -> SignalValue {
         SignalValue::Symbol(s.to_string())
+    }
+
+    /// Create a `SignalValue` from an hex string.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dwfv::signaldb::SignalValue;
+    /// let v = SignalValue::from_hex("2A");
+    /// assert_eq!(v, SignalValue::new(42));
+    /// ```
+    pub fn from_hex(s: &str) -> SignalValue {
+        let mut value = 0;
+        let chars = "0123456789abcdef";
+        for (nibble, c) in s.chars().rev().enumerate() {
+            if let Some(i) = chars.find(&c.to_lowercase().to_string()) {
+                value |= i << (nibble * 4)
+            }
+        }
+        SignalValue::new(value as u64)
     }
 
     /// Create an invalid `SignalValue`.
