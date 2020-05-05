@@ -8,6 +8,13 @@ use termion::event::Event as RawEvent;
 
 const BUFFER_MAX_SIZE:usize = 8;
 
+#[derive(Copy,Clone,Debug)]
+pub enum SearchTarget {
+    None,
+    Signal,
+    Event
+}
+
 #[derive(Clone)]
 pub enum Event {
     None,
@@ -38,7 +45,7 @@ pub enum Event {
     PasteBefore,
     Yank,
     Delete,
-    Search(String),
+    Search(SearchTarget, String),
     SearchNext,
     SearchPrev,
     SetCursorVertical(u16),
@@ -50,7 +57,7 @@ pub enum Event {
 pub enum InputMode {
     Command,
     Visual,
-    Search
+    Search(SearchTarget)
 }
 
 pub struct Events {
@@ -79,10 +86,18 @@ impl Events {
     }
 
     pub fn in_search_mode(&self) -> bool {
-        if let InputMode::Search = self.mode {
+        if let InputMode::Search(_) = self.mode {
             true
         } else {
             false
+        }
+    }
+
+    pub fn get_search_target(&self) -> SearchTarget {
+        if let InputMode::Search(target) = self.mode {
+            target
+        } else {
+            SearchTarget::None
         }
     }
 
@@ -92,7 +107,7 @@ impl Events {
         self.buffer.clear()
     }
 
-    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 33] = [
+    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 34] = [
         ("j", &|_| Event::Down),
         ("k", &|_| Event::Up),
         ("l", &|_| Event::Right),
@@ -141,7 +156,12 @@ impl Events {
             }
         }),
         ("/", &|evt| {
-            evt.mode = InputMode::Search;
+            evt.mode = InputMode::Search(SearchTarget::Signal);
+            evt.buffer.clear();
+            Event::None
+        }),
+        ("f", &|evt| {
+            evt.mode = InputMode::Search(SearchTarget::Event);
             evt.buffer.clear();
             Event::None
         }),
@@ -197,43 +217,64 @@ impl Events {
             match evt {
                 RawEvent::Key(key) => match key {
                     Key::Up => {
-                        self.events.push_back(Event::Up);
-                        self.clear_buffer()
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
+                            self.events.push_back(Event::Up);
+                            self.clear_buffer()
+                        }
                     }
                     Key::Down => {
-                        self.events.push_back(Event::Down);
-                        self.clear_buffer()
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
+                            self.events.push_back(Event::Down);
+                            self.clear_buffer()
+                        }
                     }
                     Key::Left => {
-                        self.events.push_back(Event::Left);
-                        self.clear_buffer()
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
+                            self.events.push_back(Event::Left);
+                            self.clear_buffer()
+                        }
                     }
                     Key::Right => {
-                        self.events.push_back(Event::Right);
-                        self.clear_buffer()
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
+                            self.events.push_back(Event::Right);
+                            self.clear_buffer()
+                        }
                     }
                     Key::PageUp => {
-                        self.events.push_back(Event::PageUp);
-                        self.clear_buffer()
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
+                            self.events.push_back(Event::PageUp);
+                            self.clear_buffer()
+                        }
                     }
                     Key::PageDown => {
-                        self.events.push_back(Event::PageDown);
-                        self.clear_buffer()
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
+                            self.events.push_back(Event::PageDown);
+                            self.clear_buffer()
+                        }
                     }
                     Key::Delete => {
-                        if let InputMode::Command = self.mode {
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
                             self.events.push_back(Event::Delete);
                             self.clear_buffer()
                         }
                     }
                     Key::Home => {
-                        if let InputMode::Command = self.mode {
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
                             self.events.push_back(Event::GotoFirstEvent);
                             self.clear_buffer()
                         }
                     }
                     Key::End => {
-                        if let InputMode::Command = self.mode {
+                        if let InputMode::Search(_) = self.mode {
+                        } else {
                             self.events.push_back(Event::GotoLastEvent);
                             self.clear_buffer()
                         }
@@ -243,7 +284,7 @@ impl Events {
                         self.clear_buffer()
                     }
                     Key::Backspace => {
-                        if let InputMode::Search = self.mode {
+                        if let InputMode::Search(_) = self.mode {
                             self.buffer.pop();
                         }
                     }
@@ -258,9 +299,11 @@ impl Events {
                                     self.mode = InputMode::Visual;
                                     self.events.push_back(Event::StartVisualMode)
                                 },
-                                InputMode::Search => {
+                                InputMode::Search(target) => {
                                     self.mode = InputMode::Command;
-                                    self.events.push_back(Event::Search(self.buffer.clone()))
+                                    self.events.push_back(
+                                        Event::Search(target, self.buffer.clone())
+                                    )
                                 }
                             }
                             self.buffer.clear();
@@ -278,59 +321,62 @@ impl Events {
                     _ => {}
                 },
                 RawEvent::Mouse(m) => {
-                    match m {
-                        MouseEvent::Press(button, x, y) => {
-                            match button {
-                                MouseButton::WheelUp => {
-                                    self.events.push_back(Event::ZoomIn);
-                                    self.clear_buffer()
-                                },
-                                MouseButton::WheelDown => {
-                                    self.events.push_back(Event::ZoomOut);
-                                    self.clear_buffer()
-                                },
-                                MouseButton::Left => {
+                    if let InputMode::Search(_) = self.mode {
+                    } else {
+                        match m {
+                            MouseEvent::Press(button, x, y) => {
+                                match button {
+                                    MouseButton::WheelUp => {
+                                        self.events.push_back(Event::ZoomIn);
+                                        self.clear_buffer()
+                                    },
+                                    MouseButton::WheelDown => {
+                                        self.events.push_back(Event::ZoomOut);
+                                        self.clear_buffer()
+                                    },
+                                    MouseButton::Left => {
+                                        self.events.push_back(Event::SetCursorHorizontal(x));
+                                        self.events.push_back(Event::SetCursorVertical(y));
+                                        self.clear_buffer()
+                                    },
+                                    MouseButton::Middle => {
+                                        self.events.push_back(Event::SetCursorHorizontal(x));
+                                        self.events.push_back(Event::SetCursorVertical(y));
+                                        self.events.push_back(Event::PasteBefore);
+                                        self.clear_buffer()
+                                    },
+                                    MouseButton::Right => {
+                                        self.events.push_back(Event::SetCursorHorizontal(x));
+                                        self.events.push_back(Event::SetCursorVertical(y));
+                                        self.events.push_back(Event::Yank);
+                                        self.clear_buffer()
+                                    },
+                                }
+                            },
+                            MouseEvent::Release(x, _) => {
+                                if let InputMode::Visual = self.mode {
+                                    self.mode = InputMode::Command;
                                     self.events.push_back(Event::SetCursorHorizontal(x));
-                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.events.push_back(Event::FitToSelection);
                                     self.clear_buffer()
-                                },
-                                MouseButton::Middle => {
-                                    self.events.push_back(Event::SetCursorHorizontal(x));
-                                    self.events.push_back(Event::SetCursorVertical(y));
-                                    self.events.push_back(Event::PasteBefore);
-                                    self.clear_buffer()
-                                },
-                                MouseButton::Right => {
-                                    self.events.push_back(Event::SetCursorHorizontal(x));
-                                    self.events.push_back(Event::SetCursorVertical(y));
-                                    self.events.push_back(Event::Yank);
-                                    self.clear_buffer()
-                                },
-                            }
-                        },
-                        MouseEvent::Release(x, _) => {
-                            if let InputMode::Visual = self.mode {
-                                self.mode = InputMode::Command;
+                                }
+                            },
+                            MouseEvent::Hold(x, _) => {
+                                if let InputMode::Visual = self.mode {
+                                } else {
+                                    self.mode = InputMode::Visual;
+                                    self.events.push_back(Event::StartVisualMode);
+                                }
                                 self.events.push_back(Event::SetCursorHorizontal(x));
-                                self.events.push_back(Event::FitToSelection);
                                 self.clear_buffer()
                             }
-                        },
-                        MouseEvent::Hold(x, _) => {
-                            if let InputMode::Visual = self.mode {
-                            } else {
-                                self.mode = InputMode::Visual;
-                                self.events.push_back(Event::StartVisualMode);
-                            }
-                            self.events.push_back(Event::SetCursorHorizontal(x));
-                            self.clear_buffer()
                         }
                     }
                 },
                 _ => {}
             }
         }
-        if let InputMode::Search = self.mode {
+        if let InputMode::Search(_) = self.mode {
         } else if let Ok(()) = self.parse_buffer() {
             self.clear_buffer()
         }

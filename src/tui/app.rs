@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 use super::cursorbar::{CursorBar, CursorType};
 use super::errorbar::ErrorBar;
-use super::event::{Event, Events};
+use super::event::{Event, Events, SearchTarget};
 use super::instr::TuiInstr;
 use super::searchbar::SearchBar;
 use super::statusbar::StatusBar;
@@ -22,7 +22,7 @@ use tuirs::terminal::Frame;
 use tuirs::widgets::Widget;
 
 const MAX_ZOOM:i64 = 1 << 48;
-const HELP_MSG:&str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /:Search  o:Edit  \
+const HELP_MSG:&str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /,f:Search  o:Edit  \
     yy:Peek  p,P:Pop  dd:Stash  u,r:Undo/Redo";
 
 #[derive(Clone)]
@@ -370,11 +370,14 @@ impl App {
         StatusBar::new(
             if self.events.in_visual_mode() {
                 format!(
-                    "-- VISUAL -- {} -- Enter:Zoom Fit  hjkl:Move  Esc:Abort",
+                    "-- VISUAL -- ({})  Enter:Zoom Fit  hjkl:Move  Esc:Abort",
                     self.cursor.x - self.visual_cursor.x
                 )
             } else if self.events.in_search_mode() {
-                format!("Search Signal: {}█", self.events.get_buffer()).to_string()
+                format!(
+                    "Search {:?}: {}█",
+                    self.events.get_search_target(),
+                    self.events.get_buffer()).to_string()
             } else if !status.is_empty() {
                 status
             } else {
@@ -488,6 +491,8 @@ impl App {
         if let Some(t) = res {
             self.cursor.x = t;
             self.center_window()
+        } else {
+            self.set_status("No further falling edge")
         }
     }
 
@@ -504,6 +509,8 @@ impl App {
         if let Some(t) = res {
             self.cursor.x = t;
             self.center_window()
+        } else {
+            self.set_status("No previous rising edge")
         }
     }
 
@@ -520,6 +527,8 @@ impl App {
         if let Some(t) = res {
             self.cursor.x = t;
             self.center_window()
+        } else {
+            self.set_status("No first event")
         }
     }
 
@@ -536,6 +545,8 @@ impl App {
         if let Some(t) = res {
             self.cursor.x = t;
             self.center_window()
+        } else {
+            self.set_status("No last event")
         }
     }
 
@@ -677,6 +688,27 @@ impl App {
         self.set_status(&s);
     }
 
+    fn search(&mut self, target: SearchTarget, pattern: &str) {
+        match target {
+            SearchTarget::Signal => {
+                self.search_pattern = String::from(pattern);
+                self.search_next()
+            }
+            SearchTarget::Event => {
+                if let TuiInstr::Signal(signal_id) = &self.layout[self.cursor.y] {
+                    let expr = format!("${} = {}", signal_id, pattern);
+                    self.signaldb.search(&expr);
+                    let instr = TuiInstr::Search(expr);
+                    self.snapshot_layout();
+                    self.layout.insert(self.cursor.y + 1, instr);
+                } else {
+                    self.set_status("Cannot search events in this line")
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub fn update(&mut self) -> bool {
         self.events.update();
         loop {
@@ -770,9 +802,8 @@ impl App {
                         self.set_status("Clipboard is empty");
                     }
                 },
-                Event::Search(pattern) => {
-                    self.search_pattern = pattern;
-                    self.search_next()
+                Event::Search(target, pattern) => {
+                    self.search(target, &pattern)
                 },
                 Event::SearchNext => self.search_next(),
                 Event::SearchPrev => self.search_prev(),

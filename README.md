@@ -74,7 +74,8 @@ Key Bindings
 
 ### Search
 
-- `/pattern`: search for pattern in the signal's names
+- `f`: search for event in the selected signal
+- `/`: search for pattern in the signal's names
 - `n`: repeat search forward
 - `N`: repeat search backward
 
