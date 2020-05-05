@@ -2,7 +2,7 @@
 use super::symbols::block;
 use tuirs::buffer::Buffer;
 use tuirs::layout::Rect;
-use tuirs::style::{Color, Style};
+use tuirs::style::{Color, Modifier, Style};
 use tuirs::symbols::line;
 use tuirs::widgets::Widget;
 
@@ -150,12 +150,9 @@ impl<'a> Widget for Waveform<'a> {
             &self.name,
             area.width as usize,
             Style::default()
-                .bg(if self.selected {
-                    Color::White
-                } else {
-                    Color::Gray
-                })
-                .fg(Color::Black),
+                .bg(Color::DarkGray)
+                .fg(if self.selected { Color::White } else { Color::Black })
+                .modifier( if self.selected { Modifier::BOLD } else { Modifier::empty() }),
         );
     }
 }

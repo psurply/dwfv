@@ -6,6 +6,8 @@ use termion::event::{Key, MouseEvent, MouseButton};
 use termion::input::TermRead;
 use termion::event::Event as RawEvent;
 
+const BUFFER_MAX_SIZE:usize = 8;
+
 #[derive(Clone)]
 pub enum Event {
     None,
@@ -40,7 +42,9 @@ pub enum Event {
     SearchNext,
     SearchPrev,
     SetCursorVertical(u16),
-    SetCursorHorizontal(u16)
+    SetCursorHorizontal(u16),
+    Undo,
+    Redo
 }
 
 pub enum InputMode {
@@ -88,7 +92,7 @@ impl Events {
         self.buffer.clear()
     }
 
-    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 31] = [
+    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 33] = [
         ("j", &|_| Event::Down),
         ("k", &|_| Event::Up),
         ("l", &|_| Event::Right),
@@ -116,6 +120,8 @@ impl Events {
         ("P", &|_| Event::PasteBefore),
         ("N", &|_| Event::SearchPrev),
         ("n", &|_| Event::SearchNext),
+        ("u", &|_| Event::Undo),
+        ("r", &|_| Event::Redo),
         ("v", &|evt| {
             if let InputMode::Visual = evt.mode {
                 evt.mode = InputMode::Command;
@@ -214,6 +220,24 @@ impl Events {
                         self.events.push_back(Event::PageDown);
                         self.clear_buffer()
                     }
+                    Key::Delete => {
+                        if let InputMode::Command = self.mode {
+                            self.events.push_back(Event::Delete);
+                            self.clear_buffer()
+                        }
+                    }
+                    Key::Home => {
+                        if let InputMode::Command = self.mode {
+                            self.events.push_back(Event::GotoFirstEvent);
+                            self.clear_buffer()
+                        }
+                    }
+                    Key::End => {
+                        if let InputMode::Command = self.mode {
+                            self.events.push_back(Event::GotoLastEvent);
+                            self.clear_buffer()
+                        }
+                    }
                     Key::Esc => {
                         self.mode = InputMode::Command;
                         self.clear_buffer()
@@ -241,7 +265,14 @@ impl Events {
                             }
                             self.buffer.clear();
                         } else {
-                            self.buffer.push(c)
+                            self.buffer.push(c);
+                            match self.mode {
+                                InputMode::Command | InputMode::Visual =>
+                                    if self.buffer.len() >= BUFFER_MAX_SIZE {
+                                        self.buffer.clear()
+                                    }
+                                _ => {}
+                            }
                         }
                     }
                     _ => {}
@@ -254,7 +285,7 @@ impl Events {
                                     self.events.push_back(Event::ZoomIn);
                                     self.clear_buffer()
                                 },
-                                MouseButton::WheelDown | MouseButton::Right => {
+                                MouseButton::WheelDown => {
                                     self.events.push_back(Event::ZoomOut);
                                     self.clear_buffer()
                                 },
@@ -263,7 +294,18 @@ impl Events {
                                     self.events.push_back(Event::SetCursorVertical(y));
                                     self.clear_buffer()
                                 },
-                                _ => {}
+                                MouseButton::Middle => {
+                                    self.events.push_back(Event::SetCursorHorizontal(x));
+                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.events.push_back(Event::PasteBefore);
+                                    self.clear_buffer()
+                                },
+                                MouseButton::Right => {
+                                    self.events.push_back(Event::SetCursorHorizontal(x));
+                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.events.push_back(Event::Yank);
+                                    self.clear_buffer()
+                                },
                             }
                         },
                         MouseEvent::Release(x, _) => {

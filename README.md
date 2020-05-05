@@ -42,16 +42,16 @@ Key Bindings
 
 ### Cursor movement
 
-- `h`: move cursor left
-- `j`: move cursor down
-- `k`: move cursor up
-- `l`: move cursor right
+- `h`/Left: move cursor left
+- `j`/Down: move cursor down
+- `k`/Up: move cursor up
+- `l`/Right: move cursor right
 - `w`: jump forward to the next rising edge
 - `e`: jump forward to the next falling edge
 - `b`: jump backward to the previous rising edge
 - `0`: jump to timestamp 0
-- `^`: jump to the first event
-- `$`: jump to the last event
+- `^`/Home: jump to the first event
+- `$`/End: jump to the last event
 - `gg`: jump to first signal
 - `G`: jump to last signal
 
@@ -65,14 +65,16 @@ Key Bindings
 ### Editing
 
 - `o`: edit layout
-- `dd`: delete the selected signal
+- `dd`/Delete: delete the selected signal
 - `yy`: copy the selected signal
 - `p`: paste the clipboard after cursor
 - `P`: paste the clipboard before cursor
+- `u`: undo
+- `r`: redo
 
 ### Search
 
-- `/pattern`: search for pattern in the selected signal
+- `/pattern`: search for pattern in the signal's names
 - `n`: repeat search forward
 - `N`: repeat search backward
 

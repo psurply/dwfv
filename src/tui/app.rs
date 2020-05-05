@@ -22,11 +22,18 @@ use tuirs::terminal::Frame;
 use tuirs::widgets::Widget;
 
 const MAX_ZOOM:i64 = 1 << 48;
+const HELP_MSG:&str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /:Search  o:Edit  \
+    yy:Peek  p,P:Pop  dd:Stash  u,r:Undo/Redo";
 
 #[derive(Clone)]
 struct Position {
     x: Timestamp,
     y: usize,
+}
+
+struct Memento {
+    past: Vec<Vec<TuiInstr>>,
+    future: Vec<Vec<TuiInstr>>
 }
 
 pub struct App {
@@ -39,7 +46,8 @@ pub struct App {
     events: Events,
     area: Rect,
     layout: Vec<TuiInstr>,
-    clipboard: Option<TuiInstr>,
+    memento: Memento,
+    clipboard: Vec<TuiInstr>,
     search_pattern: String
 }
 
@@ -70,7 +78,11 @@ impl App {
             events: Events::new(),
             area: Rect::new(0, 0, 0, 0),
             layout,
-            clipboard: None,
+            memento: Memento {
+                past: Vec::new(),
+                future: Vec::new()
+            },
+            clipboard: Vec::new(),
             search_pattern: String::new()
         };
 
@@ -268,7 +280,8 @@ impl App {
         }
 
         if self.cursor.y > self.layout.len() {
-            self.cursor.y = self.layout.len() - 1
+            self.cursor.y = self.layout.len() - 1;
+            self.set_status("Reached last signal")
         }
         while TuiInstr::total_height(&self.layout[self.window.y..=self.cursor.y])
             > self.area.height as usize
@@ -333,7 +346,8 @@ impl App {
 
     pub fn render<B: Backend>(&mut self, f: &mut Frame<B>) {
         if self.cursor.y >= self.layout.len() {
-            self.cursor.y = self.layout.len() - 1
+            self.cursor.y = self.layout.len() - 1;
+            self.set_status("Reached last signal")
         }
         let (header, body, footer) = App::alloc_top_level_layout(f.size());
         self.area = body;
@@ -349,13 +363,22 @@ impl App {
         )
         .render(f, header);
         self.render_instrs(f);
+        let status = self.signaldb.sync_db.get_status();
+        if !status.is_empty() {
+            self.set_status("")
+        };
         StatusBar::new(
             if self.events.in_visual_mode() {
-                "-- VISUAL --".to_string()
+                format!(
+                    "-- VISUAL -- {} -- Enter:Zoom Fit  hjkl:Move  Esc:Abort",
+                    self.cursor.x - self.visual_cursor.x
+                )
             } else if self.events.in_search_mode() {
-                format!("Search: {}█", self.events.get_buffer()).to_string()
+                format!("Search Signal: {}█", self.events.get_buffer()).to_string()
+            } else if !status.is_empty() {
+                status
             } else {
-                self.signaldb.sync_db.get_status()
+                HELP_MSG.to_string()
             },
             if !self.events.in_search_mode() {
                 self.events.get_buffer().to_string()
@@ -399,6 +422,7 @@ impl App {
     pub fn update_layout<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Box<dyn Error>> {
         let f = File::open(&path)?;
         let file = BufReader::new(f);
+        self.snapshot_layout();
         self.update_layout_list(TuiInstr::parse(file));
         Ok(())
     }
@@ -446,6 +470,8 @@ impl App {
         if let Some(t) = res {
             self.cursor.x = t;
             self.center_window()
+        } else {
+            self.set_status("No further rising edge")
         }
     }
 
@@ -554,9 +580,13 @@ impl App {
                     } else if last_event < self.cursor.x {
                         self.cursor.x = last_event;
                     }
+                } else {
+                    self.set_status("Cannot zoom more")
                 }
             },
-            _ => ()
+            _ => {
+                self.set_status(&format!("Cannot zoom fit {}", &self.layout[self.cursor.y]))
+            }
         }
     }
 
@@ -581,6 +611,7 @@ impl App {
                 return
             }
         }
+        self.set_status(&format!("Cannot find '{}' downward", self.search_pattern))
     }
 
     fn search_prev(&mut self) {
@@ -595,6 +626,34 @@ impl App {
                 return
             }
         }
+        self.set_status(&format!("Cannot find '{}' upward", self.search_pattern))
+    }
+
+    fn set_status(&mut self, msg: &str) {
+        self.signaldb.sync_db.set_status(msg);
+    }
+
+    fn undo(&mut self) {
+        if let Some(prev_layout) = self.memento.past.pop() {
+            self.memento.future.push(self.layout.clone());
+            self.update_layout_list(prev_layout)
+        } else {
+            self.set_status("No previous changes")
+        }
+    }
+
+    fn redo(&mut self) {
+        if let Some(next_layout) = self.memento.future.pop() {
+            self.memento.past.push(self.layout.clone());
+            self.update_layout_list(next_layout)
+        } else {
+            self.set_status("Already at newest change")
+        }
+    }
+
+    fn snapshot_layout(&mut self) {
+        self.memento.past.push(self.layout.clone());
+        self.memento.future.clear();
     }
 
     fn up(&mut self) {
@@ -638,7 +697,8 @@ impl App {
                     if self.cursor.y > height {
                         self.cursor.y -= height
                     } else {
-                        self.cursor.y = 0
+                        self.cursor.y = 0;
+                        self.set_status("Reached first signal")
                     }
                 }
                 Event::PageDown => {
@@ -647,7 +707,8 @@ impl App {
                 Event::ZoomOut => {
                     let mut scale = self.scale.get_value() * 2;
                     if scale > MAX_ZOOM {
-                        scale = MAX_ZOOM
+                        scale = MAX_ZOOM;
+                        self.set_status("Cannot zoom out more")
                     }
                     self.scale = Timestamp::new(scale);
                     self.center_window()
@@ -655,7 +716,8 @@ impl App {
                 Event::ZoomIn => {
                     let mut scale = self.scale.get_value() / 2;
                     if scale < 1 {
-                        scale = 1
+                        scale = 1;
+                        self.set_status("Cannot zoom in more")
                     };
                     self.scale = Timestamp::new(scale);
                     self.center_window()
@@ -677,22 +739,35 @@ impl App {
                 Event::FitToSelection => self.fit_to_selection(),
                 Event::Edit => self.edit(),
                 Event::Delete => {
+                    self.snapshot_layout();
+                    self.set_status(&format!(
+                        "Stashed {}", self.layout[self.cursor.y]
+                    ));
                     if self.layout.len() > 1 {
-                        self.clipboard = Some(self.layout.remove(self.cursor.y))
-                    }
+                        self.clipboard.push(self.layout.remove(self.cursor.y))
+                    };
                 },
                 Event::Yank => {
-                    self.clipboard = Some(self.layout[self.cursor.y].clone())
+                    self.set_status(&format!("Peeked {}", self.layout[self.cursor.y]));
+                    self.clipboard.push(self.layout[self.cursor.y].clone())
                 },
                 Event::PasteBefore => {
-                    if let Some(clipboard) = &self.clipboard {
-                        self.layout.insert(self.cursor.y, clipboard.clone())
+                    self.snapshot_layout();
+                    if let Some(clipboard) = self.clipboard.pop() {
+                        self.layout.insert(self.cursor.y, clipboard.clone());
+                        self.signaldb.sync_db.set_status(&format!("Popped {}", clipboard))
+                    } else {
+                        self.set_status("Clipboard is empty");
                     }
                 },
                 Event::PasteAfter => {
-                    if let Some(clipboard) = &self.clipboard {
+                    self.snapshot_layout();
+                    if let Some(clipboard) = self.clipboard.pop() {
                         self.cursor.y += 1;
-                        self.layout.insert(self.cursor.y, clipboard.clone())
+                        self.layout.insert(self.cursor.y, clipboard.clone());
+                        self.signaldb.sync_db.set_status(&format!("Popped {}", clipboard))
+                    } else {
+                        self.set_status("Clipboard is empty");
                     }
                 },
                 Event::Search(pattern) => {
@@ -703,6 +778,8 @@ impl App {
                 Event::SearchPrev => self.search_prev(),
                 Event::SetCursorVertical(x) => self.set_cursor_vertical(x),
                 Event::SetCursorHorizontal(y) => self.set_cursor_horizontal(y),
+                Event::Undo => self.undo(),
+                Event::Redo => self.redo(),
                 _ => (),
             }
         }
