@@ -144,15 +144,19 @@ impl<'a> Widget for Waveform<'a> {
             }
         }
 
+        let annot_style = Style::default()
+            .bg(Color::DarkGray)
+            .fg(if self.selected { Color::White } else { Color::Black })
+            .modifier(if self.selected { Modifier::BOLD } else { Modifier::empty() });
+
         buf.set_stringn(
-            area.left(),
-            area.top(),
-            &self.name,
-            area.width as usize,
-            Style::default()
-                .bg(Color::DarkGray)
-                .fg(if self.selected { Color::White } else { Color::Black })
-                .modifier( if self.selected { Modifier::BOLD } else { Modifier::empty() }),
+            area.left(), area.top(), block::FULL_LOWER, area.width as usize,
+            Style::default().fg(Color::DarkGray)
         );
+        buf.set_stringn(
+            area.left(), area.top() + 2, block::FULL_UPPER, area.width as usize,
+            Style::default().fg(Color::DarkGray)
+        );
+        buf.set_stringn(area.left(), area.top() + 1, &self.name, area.width as usize, annot_style);
     }
 }

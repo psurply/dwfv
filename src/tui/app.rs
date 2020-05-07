@@ -188,7 +188,7 @@ impl App {
         let fullname = self.signaldb.sync_db.get_signal_fullname(signal_id)?;
         Waveform::new(
             format!("{}{}: {} = {}",
-                    if selected { "-> " } else { "" },
+                    if selected { "> " } else { "" },
                     signal_id, fullname, value),
             &data[..],
             selected,
