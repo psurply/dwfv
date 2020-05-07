@@ -1,6 +1,6 @@
 [package]
 name = "dwfv"
-version = "0.1.0"
+version = "0.2.0"
 description = "A simple digital waveform viewer with vi-like key bindings"
 authors = ["Pierre Surply <pierre.surply@lse.epita.fr>"]
 readme = "README.md"
