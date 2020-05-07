@@ -811,6 +811,7 @@ impl App {
                 Event::SetCursorHorizontal(y) => self.set_cursor_horizontal(y),
                 Event::Undo => self.undo(),
                 Event::Redo => self.redo(),
+                Event::ShowClipboard => self.show_clipboard(),
                 _ => (),
             }
         }

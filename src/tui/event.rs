@@ -51,7 +51,8 @@ pub enum Event {
     SetCursorVertical(u16),
     SetCursorHorizontal(u16),
     Undo,
-    Redo
+    Redo,
+    ShowClipboard
 }
 
 pub enum InputMode {
@@ -107,7 +108,7 @@ impl Events {
         self.buffer.clear()
     }
 
-    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 34] = [
+    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 35] = [
         ("j", &|_| Event::Down),
         ("k", &|_| Event::Up),
         ("l", &|_| Event::Right),
@@ -137,6 +138,7 @@ impl Events {
         ("n", &|_| Event::SearchNext),
         ("u", &|_| Event::Undo),
         ("r", &|_| Event::Redo),
+        ("c", &|_| Event::ShowClipboard),
         ("v", &|evt| {
             if let InputMode::Visual = evt.mode {
                 evt.mode = InputMode::Command;

@@ -71,6 +71,7 @@ Key Bindings
 - `P`: paste the clipboard before cursor
 - `u`: undo
 - `r`: redo
+- `c`: show clipboard
 
 ### Search
 
