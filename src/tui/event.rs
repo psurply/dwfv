@@ -2,17 +2,17 @@
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io;
-use termion::event::{Key, MouseEvent, MouseButton};
-use termion::input::TermRead;
 use termion::event::Event as RawEvent;
+use termion::event::{Key, MouseButton, MouseEvent};
+use termion::input::TermRead;
 
-const BUFFER_MAX_SIZE:usize = 8;
+const BUFFER_MAX_SIZE: usize = 8;
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum SearchTarget {
     None,
     Signal,
-    Event
+    Event,
 }
 
 #[derive(Clone)]
@@ -52,20 +52,20 @@ pub enum Event {
     SetCursorHorizontal(u16),
     Undo,
     Redo,
-    ShowClipboard
+    ShowClipboard,
 }
 
 pub enum InputMode {
     Command,
     Visual,
-    Search(SearchTarget)
+    Search(SearchTarget),
 }
 
 pub struct Events {
     buffer: String,
     previous_buffer: String,
     events: VecDeque<Event>,
-    mode: InputMode
+    mode: InputMode,
 }
 
 impl Events {
@@ -172,7 +172,7 @@ impl Events {
             evt.buffer.push_str(&evt.previous_buffer);
             let _ = evt.parse_buffer();
             Event::None
-        })
+        }),
     ];
 
     fn parse_buffer(&mut self) -> Result<(), ()> {
@@ -187,11 +187,11 @@ impl Events {
                 let cmd_buff = cmd_buff.as_str().to_string();
                 for (name, action) in Events::CMDS.iter() {
                     if cmd_buff.contains(name) {
-                         cmd = action(self)
+                        cmd = action(self)
                     }
                 }
             } else {
-                return Err(())
+                return Err(());
             }
 
             let repeat = if let Some(i) = cap.name("i") {
@@ -296,26 +296,26 @@ impl Events {
                                 InputMode::Visual => {
                                     self.mode = InputMode::Command;
                                     self.events.push_back(Event::FitToSelection)
-                                },
+                                }
                                 InputMode::Command => {
                                     self.mode = InputMode::Visual;
                                     self.events.push_back(Event::StartVisualMode)
-                                },
+                                }
                                 InputMode::Search(target) => {
                                     self.mode = InputMode::Command;
-                                    self.events.push_back(
-                                        Event::Search(target, self.buffer.clone())
-                                    )
+                                    self.events
+                                        .push_back(Event::Search(target, self.buffer.clone()))
                                 }
                             }
                             self.buffer.clear();
                         } else {
                             self.buffer.push(c);
                             match self.mode {
-                                InputMode::Command | InputMode::Visual =>
+                                InputMode::Command | InputMode::Visual => {
                                     if self.buffer.len() >= BUFFER_MAX_SIZE {
                                         self.buffer.clear()
                                     }
+                                }
                                 _ => {}
                             }
                         }
@@ -326,33 +326,31 @@ impl Events {
                     if let InputMode::Search(_) = self.mode {
                     } else {
                         match m {
-                            MouseEvent::Press(button, x, y) => {
-                                match button {
-                                    MouseButton::WheelUp => {
-                                        self.events.push_back(Event::ZoomIn);
-                                        self.clear_buffer()
-                                    },
-                                    MouseButton::WheelDown => {
-                                        self.events.push_back(Event::ZoomOut);
-                                        self.clear_buffer()
-                                    },
-                                    MouseButton::Left => {
-                                        self.events.push_back(Event::SetCursorHorizontal(x));
-                                        self.events.push_back(Event::SetCursorVertical(y));
-                                        self.clear_buffer()
-                                    },
-                                    MouseButton::Middle => {
-                                        self.events.push_back(Event::SetCursorHorizontal(x));
-                                        self.events.push_back(Event::SetCursorVertical(y));
-                                        self.events.push_back(Event::PasteBefore);
-                                        self.clear_buffer()
-                                    },
-                                    MouseButton::Right => {
-                                        self.events.push_back(Event::SetCursorHorizontal(x));
-                                        self.events.push_back(Event::SetCursorVertical(y));
-                                        self.events.push_back(Event::Yank);
-                                        self.clear_buffer()
-                                    },
+                            MouseEvent::Press(button, x, y) => match button {
+                                MouseButton::WheelUp => {
+                                    self.events.push_back(Event::ZoomIn);
+                                    self.clear_buffer()
+                                }
+                                MouseButton::WheelDown => {
+                                    self.events.push_back(Event::ZoomOut);
+                                    self.clear_buffer()
+                                }
+                                MouseButton::Left => {
+                                    self.events.push_back(Event::SetCursorHorizontal(x));
+                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.clear_buffer()
+                                }
+                                MouseButton::Middle => {
+                                    self.events.push_back(Event::SetCursorHorizontal(x));
+                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.events.push_back(Event::PasteBefore);
+                                    self.clear_buffer()
+                                }
+                                MouseButton::Right => {
+                                    self.events.push_back(Event::SetCursorHorizontal(x));
+                                    self.events.push_back(Event::SetCursorVertical(y));
+                                    self.events.push_back(Event::Yank);
+                                    self.clear_buffer()
                                 }
                             },
                             MouseEvent::Release(x, _) => {
@@ -362,7 +360,7 @@ impl Events {
                                     self.events.push_back(Event::FitToSelection);
                                     self.clear_buffer()
                                 }
-                            },
+                            }
                             MouseEvent::Hold(x, _) => {
                                 if let InputMode::Visual = self.mode {
                                 } else {
@@ -374,7 +372,7 @@ impl Events {
                             }
                         }
                     }
-                },
+                }
                 _ => {}
             }
         }

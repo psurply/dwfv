@@ -14,7 +14,7 @@ use std::sync::{Condvar, Mutex};
 /// Signal Database
 ///
 /// Example:
-/// 
+///
 /// ```
 /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
 /// let mut db = SignalDB::new();
@@ -27,7 +27,7 @@ pub struct SignalDB {
     searches: Mutex<HashMap<String, Search>>,
     status: Mutex<String>,
     initialized: (Mutex<bool>, Condvar),
-    valid: Mutex<bool>
+    valid: Mutex<bool>,
 }
 
 #[derive(Debug)]
@@ -50,7 +50,7 @@ impl fmt::Display for SignalNotFound {
 impl SignalNotFound {
     fn new(signal_id: &str) -> Self {
         SignalNotFound {
-            signal_id: signal_id.to_string()
+            signal_id: signal_id.to_string(),
         }
     }
 }
@@ -63,7 +63,7 @@ pub struct SearchNotFound {
 impl SearchNotFound {
     fn new(expr: &str) -> SearchNotFound {
         SearchNotFound {
-            expr: expr.to_string()
+            expr: expr.to_string(),
         }
     }
 }
@@ -88,7 +88,7 @@ pub struct InitializationError {
 impl InitializationError {
     fn new(msg: &str) -> InitializationError {
         InitializationError {
-            msg: msg.to_string()
+            msg: msg.to_string(),
         }
     }
 }
@@ -152,7 +152,7 @@ impl SignalDB {
             searches: Mutex::new(HashMap::new()),
             status: Mutex::new(String::from("Test")),
             initialized: (Mutex::new(false), Condvar::new()),
-            valid: Mutex::new(true)
+            valid: Mutex::new(true),
         }
     }
 
@@ -270,7 +270,6 @@ impl SignalDB {
     pub fn parse_vcd<I: io::BufRead>(&self, input: I) -> Result<(), Box<dyn Error>> {
         self.parse_vcd_with_limit(input, None)
     }
-
 
     /// Extend the current `SignalDB` with the signals defined in a Value Change Dump (VCD) file
     /// and stop parsing the VCD file after reaching a given timestamp.
@@ -663,7 +662,8 @@ impl SignalDB {
         Ok(signals
             .get(signal_id)
             .ok_or_else(|| SignalNotFound::new(signal_id))?
-            .name.to_string())
+            .name
+            .to_string())
     }
 
     /// Check that a signal exists in the `SignalDB`.
@@ -705,8 +705,10 @@ impl SignalDB {
     /// assert_eq!(db.find_signals(|s| s.name == "baz"), vec!["0"]);
     /// assert_eq!(db.find_signals(|s| s.name == "").len(), 0);
     /// ```
-    pub fn find_signals<F>(&self, f: F) -> Vec<String> where
-        F: Fn(&Signal) -> bool {
+    pub fn find_signals<F>(&self, f: F) -> Vec<String>
+    where
+        F: Fn(&Signal) -> bool,
+    {
         let mut matches = Vec::new();
         let signals = self.signals.lock().unwrap();
         for (key, signal) in signals.iter() {
@@ -1065,11 +1067,7 @@ impl SignalDB {
     /// Check if an expression is valid at a given point of time.
     /// The expression must first be reported to the `SignalDB` using the `search_init` function.
     /// This is meant to be used for asynchronous searches (see `AsyncSignalDB`)
-    pub fn search_at(
-        &self,
-        expr: &str,
-        timestamp: Timestamp
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn search_at(&self, expr: &str, timestamp: Timestamp) -> Result<(), Box<dyn Error>> {
         let mut searches = self.searches.lock().unwrap();
         Ok(searches
             .get_mut(expr)

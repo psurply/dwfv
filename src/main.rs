@@ -2,7 +2,7 @@
 extern crate clap;
 extern crate dwfv;
 
-use clap::{App, Arg, ArgMatches, SubCommand, crate_description, crate_version};
+use clap::{crate_description, crate_version, App, Arg, ArgMatches, SubCommand};
 use dwfv::signaldb::{AsyncSignalDB, SignalDB, Timestamp};
 use dwfv::tui::Tui;
 use std::error::Error;
@@ -64,18 +64,17 @@ fn main() {
                 .help("Layout file to use in the TUI")
                 .takes_value(true),
         )
-        .subcommand(
-            SubCommand::with_name("stats")
-                .about("Shows stats about the input")
-        )
+        .subcommand(SubCommand::with_name("stats").about("Shows stats about the input"))
         .subcommand(
             SubCommand::with_name("at")
                 .about("Displays states of the signals at a given timestamp")
-                .arg(Arg::with_name("TIMESTAMP").required(true)))
+                .arg(Arg::with_name("TIMESTAMP").required(true)),
+        )
         .subcommand(
             SubCommand::with_name("when")
                 .about("Displays the time periods when the specified expression is true")
-                .arg(Arg::with_name("EXPR").required(true)))
+                .arg(Arg::with_name("EXPR").required(true)),
+        )
         .get_matches();
 
     if let Err(e) = run(matches) {

@@ -7,7 +7,7 @@ use super::searchbar::SearchBar;
 use super::statusbar::StatusBar;
 use super::waveform::{Waveform, WaveformElement};
 use crate::signaldb::{AsyncSignalDB, SignalValue, Timestamp};
-use std::cmp;
+use std::cmp::{self, Ordering};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -21,8 +21,8 @@ use tuirs::layout::Rect;
 use tuirs::terminal::Frame;
 use tuirs::widgets::Widget;
 
-const MAX_ZOOM:i64 = 1 << 48;
-const HELP_MSG:&str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /,f:Search  o:Edit  \
+const MAX_ZOOM: i64 = 1 << 48;
+const HELP_MSG: &str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /,f:Search  o:Edit  \
     yy:Peek  p,P:Pop  dd:Stash  u,r:Undo/Redo";
 
 #[derive(Clone)]
@@ -33,7 +33,7 @@ struct Position {
 
 struct Memento {
     past: Vec<Vec<TuiInstr>>,
-    future: Vec<Vec<TuiInstr>>
+    future: Vec<Vec<TuiInstr>>,
 }
 
 pub struct App {
@@ -48,7 +48,7 @@ pub struct App {
     layout: Vec<TuiInstr>,
     memento: Memento,
     clipboard: Vec<TuiInstr>,
-    search_pattern: String
+    search_pattern: String,
 }
 
 impl App {
@@ -80,10 +80,10 @@ impl App {
             layout,
             memento: Memento {
                 past: Vec::new(),
-                future: Vec::new()
+                future: Vec::new(),
             },
             clipboard: Vec::new(),
-            search_pattern: String::new()
+            search_pattern: String::new(),
         };
 
         app.goto_first_event();
@@ -151,9 +151,10 @@ impl App {
         let mut data = Vec::new();
         for i in 0..rect.width {
             let (begin, end) = self.get_time_range(i);
-            let (before, nb_events, after) = self.signaldb.sync_db.events_between(
-                signal_id, begin, end
-            )?;
+            let (before, nb_events, after) = self
+                .signaldb
+                .sync_db
+                .events_between(signal_id, begin, end)?;
             if after.is_invalid() {
                 data.push(WaveformElement::Invalid)
             } else if nb_events == 0 || (nb_events == 1 && before.is_invalid()) {
@@ -187,13 +188,17 @@ impl App {
         let value = self.signaldb.sync_db.value_at(signal_id, self.cursor.x)?;
         let fullname = self.signaldb.sync_db.get_signal_fullname(signal_id)?;
         Waveform::new(
-            format!("{}{}: {} = {}",
-                    if selected { "> " } else { "" },
-                    signal_id, fullname, value),
+            format!(
+                "{}{}: {} = {}",
+                if selected { "> " } else { "" },
+                signal_id,
+                fullname,
+                value
+            ),
             &data[..],
             selected,
             self.get_relative_cursor_x(),
-            self.get_relative_visual_cursor_x()
+            self.get_relative_visual_cursor_x(),
         )
         .render(f, rect);
         Ok(())
@@ -216,7 +221,7 @@ impl App {
             &data[..],
             selected,
             self.get_relative_cursor_x(),
-            self.get_relative_visual_cursor_x()
+            self.get_relative_visual_cursor_x(),
         )
         .render(f, rect);
         Ok(())
@@ -297,9 +302,9 @@ impl App {
 
     fn get_current_instr_height(&self) -> usize {
         let mut height = 0;
-        while self.window.y + height < self.layout.len() &&
-            TuiInstr::total_height(&self.layout[self.window.y..=self.window.y + height]) <
-            self.area.height as usize
+        while self.window.y + height < self.layout.len()
+            && TuiInstr::total_height(&self.layout[self.window.y..=self.window.y + height])
+                < self.area.height as usize
         {
             height += 1
         }
@@ -309,15 +314,17 @@ impl App {
     fn center_window_vertical(&mut self) {
         let height = self.get_current_instr_height();
         let middle = self.window.y + height / 2;
-        if middle < self.cursor.y {
-            self.window.y += self.cursor.y - middle
-        } else if middle > self.cursor.y {
-            let shift = middle - self.cursor.y;
-            if self.window.y > shift {
-                self.window.y -= shift
-            } else {
-                self.window.y = 0
+        match middle.cmp(&self.cursor.y) {
+            Ordering::Greater => self.window.y += self.cursor.y - middle,
+            Ordering::Less => {
+                let shift = middle - self.cursor.y;
+                if self.window.y > shift {
+                    self.window.y -= shift
+                } else {
+                    self.window.y = 0
+                }
             }
+            Ordering::Equal => {}
         }
 
         self.adjust_window()
@@ -326,7 +333,6 @@ impl App {
     fn set_cursor_horizontal(&mut self, x: u16) {
         let offset = Timestamp::new((x - 1) as i64 * self.scale.get_value());
         self.cursor.x = self.window.x + offset;
-
     }
 
     fn set_cursor_vertical(&mut self, y: u16) {
@@ -337,7 +343,7 @@ impl App {
             for (i, instr) in self.layout[self.window.y..].iter().enumerate() {
                 if (y as usize) >= height && (y as usize) <= height + instr.height() + 1 {
                     self.cursor.y = i + self.window.y;
-                    break
+                    break;
                 }
                 height += instr.height()
             }
@@ -377,7 +383,8 @@ impl App {
                 format!(
                     "Search {:?}: {}█",
                     self.events.get_search_target(),
-                    self.events.get_buffer()).to_string()
+                    self.events.get_buffer()
+                )
             } else if !status.is_empty() {
                 status
             } else {
@@ -387,7 +394,7 @@ impl App {
                 self.events.get_buffer().to_string()
             } else {
                 "".to_string()
-            }
+            },
         )
         .render(f, footer)
     }
@@ -446,15 +453,14 @@ impl App {
                         if let Some(id) = ids.pop() {
                             reviewed_layout.push(TuiInstr::Signal(id))
                         } else {
-                            reviewed_layout.push(
-                                TuiInstr::Error(signal.clone(), "Unknown signal".to_string())
-                            )
+                            reviewed_layout.push(TuiInstr::Error(
+                                signal.clone(),
+                                "Unknown signal".to_string(),
+                            ))
                         }
                     }
                 }
-                TuiInstr::Error(_, _) => {
-                    reviewed_layout.push(instr.clone())
-                }
+                TuiInstr::Error(_, _) => reviewed_layout.push(instr.clone()),
             }
         }
         self.layout = reviewed_layout
@@ -462,13 +468,17 @@ impl App {
 
     fn goto_next_rising_edge(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => {
-                self.signaldb.sync_db.get_next_rising_edge(&id, self.cursor.x).unwrap()
-            },
-            TuiInstr::Search(expr) => {
-                self.signaldb.sync_db.get_next_finding(&expr, self.cursor.x).unwrap()
-            },
-            _ => None
+            TuiInstr::Signal(id) => self
+                .signaldb
+                .sync_db
+                .get_next_rising_edge(&id, self.cursor.x)
+                .unwrap(),
+            TuiInstr::Search(expr) => self
+                .signaldb
+                .sync_db
+                .get_next_finding(&expr, self.cursor.x)
+                .unwrap(),
+            _ => None,
         };
         if let Some(t) = res {
             self.cursor.x = t;
@@ -480,13 +490,17 @@ impl App {
 
     fn goto_next_falling_edge(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => {
-                self.signaldb.sync_db.get_next_falling_edge(&id, self.cursor.x).unwrap()
-            },
-            TuiInstr::Search(expr) => {
-                self.signaldb.sync_db.get_end_of_next_finding(&expr, self.cursor.x).unwrap()
-            },
-            _ => None
+            TuiInstr::Signal(id) => self
+                .signaldb
+                .sync_db
+                .get_next_falling_edge(&id, self.cursor.x)
+                .unwrap(),
+            TuiInstr::Search(expr) => self
+                .signaldb
+                .sync_db
+                .get_end_of_next_finding(&expr, self.cursor.x)
+                .unwrap(),
+            _ => None,
         };
         if let Some(t) = res {
             self.cursor.x = t;
@@ -498,13 +512,17 @@ impl App {
 
     fn goto_previous_rising_edge(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => {
-                self.signaldb.sync_db.get_previous_rising_edge(&id, self.cursor.x).unwrap_or(None)
-            },
-            TuiInstr::Search(expr) => {
-                self.signaldb.sync_db.get_previous_finding(&expr, self.cursor.x).unwrap_or(None)
-            },
-            _ => None
+            TuiInstr::Signal(id) => self
+                .signaldb
+                .sync_db
+                .get_previous_rising_edge(&id, self.cursor.x)
+                .unwrap_or(None),
+            TuiInstr::Search(expr) => self
+                .signaldb
+                .sync_db
+                .get_previous_finding(&expr, self.cursor.x)
+                .unwrap_or(None),
+            _ => None,
         };
         if let Some(t) = res {
             self.cursor.x = t;
@@ -516,13 +534,13 @@ impl App {
 
     fn goto_first_event(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => {
-                self.signaldb.sync_db.get_first_event(&id).unwrap_or(None)
-            },
-            TuiInstr::Search(expr) => {
-                self.signaldb.sync_db.get_first_finding(&expr).unwrap_or(None)
-            },
-            _ => None
+            TuiInstr::Signal(id) => self.signaldb.sync_db.get_first_event(&id).unwrap_or(None),
+            TuiInstr::Search(expr) => self
+                .signaldb
+                .sync_db
+                .get_first_finding(&expr)
+                .unwrap_or(None),
+            _ => None,
         };
         if let Some(t) = res {
             self.cursor.x = t;
@@ -534,13 +552,13 @@ impl App {
 
     fn goto_last_event(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => {
-                self.signaldb.sync_db.get_last_event(&id).unwrap_or(None)
-            },
-            TuiInstr::Search(expr) => {
-                self.signaldb.sync_db.get_last_finding(&expr).unwrap_or(None)
-            },
-            _ => None
+            TuiInstr::Signal(id) => self.signaldb.sync_db.get_last_event(&id).unwrap_or(None),
+            TuiInstr::Search(expr) => self
+                .signaldb
+                .sync_db
+                .get_last_finding(&expr)
+                .unwrap_or(None),
+            _ => None,
         };
         if let Some(t) = res {
             self.cursor.x = t;
@@ -568,13 +586,19 @@ impl App {
         let period = match &self.layout[self.cursor.y] {
             TuiInstr::Signal(id) => Some((
                 self.signaldb.sync_db.get_first_event(&id).unwrap_or(None),
-                self.signaldb.sync_db.get_last_event(&id).unwrap_or(None)
+                self.signaldb.sync_db.get_last_event(&id).unwrap_or(None),
             )),
             TuiInstr::Search(expr) => Some((
-                self.signaldb.sync_db.get_first_finding(&expr).unwrap_or(None),
-                self.signaldb.sync_db.get_last_finding(&expr).unwrap_or(None)
+                self.signaldb
+                    .sync_db
+                    .get_first_finding(&expr)
+                    .unwrap_or(None),
+                self.signaldb
+                    .sync_db
+                    .get_last_finding(&expr)
+                    .unwrap_or(None),
             )),
-            _ => None
+            _ => None,
         };
 
         match period {
@@ -594,10 +618,8 @@ impl App {
                 } else {
                     self.set_status("Cannot zoom more")
                 }
-            },
-            _ => {
-                self.set_status(&format!("Cannot zoom fit {}", &self.layout[self.cursor.y]))
             }
+            _ => self.set_status(&format!("Cannot zoom fit {}", &self.layout[self.cursor.y])),
         }
     }
 
@@ -605,21 +627,21 @@ impl App {
         let id = match instr {
             TuiInstr::Signal(id) => self.signaldb.sync_db.get_signal_fullname(id).unwrap(),
             TuiInstr::Search(expr) => expr.to_string(),
-            _ => return false
+            _ => return false,
         };
         id.contains(&self.search_pattern)
     }
 
     fn search_next(&mut self) {
         if self.cursor.y + 1 >= self.layout.len() {
-            return
+            return;
         }
         for (i, instr) in self.layout[self.cursor.y + 1..].iter().enumerate() {
             if self.matches_search_pattern(&instr) {
                 self.cursor.y += i + 1;
                 self.adjust_window();
                 self.center_window_vertical();
-                return
+                return;
             }
         }
         self.set_status(&format!("Cannot find '{}' downward", self.search_pattern))
@@ -627,14 +649,14 @@ impl App {
 
     fn search_prev(&mut self) {
         if self.cursor.y == 0 {
-            return
+            return;
         }
         for (i, instr) in self.layout[..self.cursor.y].iter().rev().enumerate() {
             if self.matches_search_pattern(instr) {
                 self.cursor.y -= i + 1;
                 self.adjust_window();
                 self.center_window_vertical();
-                return
+                return;
             }
         }
         self.set_status(&format!("Cannot find '{}' upward", self.search_pattern))
@@ -733,9 +755,7 @@ impl App {
                         self.set_status("Reached first signal")
                     }
                 }
-                Event::PageDown => {
-                    self.cursor.y += self.get_current_instr_height()
-                }
+                Event::PageDown => self.cursor.y += self.get_current_instr_height(),
                 Event::ZoomOut => {
                     let mut scale = self.scale.get_value() * 2;
                     if scale > MAX_ZOOM {
@@ -753,12 +773,12 @@ impl App {
                     };
                     self.scale = Timestamp::new(scale);
                     self.center_window()
-                },
+                }
                 Event::ZoomFit => self.zoom_fit(),
                 Event::CenterWindow => {
                     self.center_window();
                     self.center_window_vertical()
-                },
+                }
                 Event::GotoTop => self.cursor.y = 0,
                 Event::GotoLast => self.cursor.y = std::usize::MAX,
                 Event::GotoNextRisingEdge => self.goto_next_rising_edge(),
@@ -772,39 +792,39 @@ impl App {
                 Event::Edit => self.edit(),
                 Event::Delete => {
                     self.snapshot_layout();
-                    self.set_status(&format!(
-                        "Stashed {}", self.layout[self.cursor.y]
-                    ));
+                    self.set_status(&format!("Stashed {}", self.layout[self.cursor.y]));
                     if self.layout.len() > 1 {
                         self.clipboard.push(self.layout.remove(self.cursor.y))
                     };
-                },
+                }
                 Event::Yank => {
                     self.set_status(&format!("Peeked {}", self.layout[self.cursor.y]));
                     self.clipboard.push(self.layout[self.cursor.y].clone())
-                },
+                }
                 Event::PasteBefore => {
                     self.snapshot_layout();
                     if let Some(clipboard) = self.clipboard.pop() {
                         self.layout.insert(self.cursor.y, clipboard.clone());
-                        self.signaldb.sync_db.set_status(&format!("Popped {}", clipboard))
+                        self.signaldb
+                            .sync_db
+                            .set_status(&format!("Popped {}", clipboard))
                     } else {
                         self.set_status("Clipboard is empty");
                     }
-                },
+                }
                 Event::PasteAfter => {
                     self.snapshot_layout();
                     if let Some(clipboard) = self.clipboard.pop() {
                         self.cursor.y += 1;
                         self.layout.insert(self.cursor.y, clipboard.clone());
-                        self.signaldb.sync_db.set_status(&format!("Popped {}", clipboard))
+                        self.signaldb
+                            .sync_db
+                            .set_status(&format!("Popped {}", clipboard))
                     } else {
                         self.set_status("Clipboard is empty");
                     }
-                },
-                Event::Search(target, pattern) => {
-                    self.search(target, &pattern)
-                },
+                }
+                Event::Search(target, pattern) => self.search(target, &pattern),
                 Event::SearchNext => self.search_next(),
                 Event::SearchPrev => self.search_prev(),
                 Event::SetCursorVertical(x) => self.set_cursor_vertical(x),

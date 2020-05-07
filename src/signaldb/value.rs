@@ -20,7 +20,7 @@ struct NibbleValue([BitValue; 4]);
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ValueFormat {
     Hex,
-    Bin
+    Bin,
 }
 
 /// Value of a signal
@@ -29,7 +29,7 @@ pub enum SignalValue {
     /// Concrete value of the signal
     Literal(Vec<BitValue>, ValueFormat),
     /// Symbolic value of the signal
-    Symbol(String)
+    Symbol(String),
 }
 
 impl BitValue {
@@ -102,7 +102,7 @@ impl NibbleValue {
                 match i {
                     BitValue::Low => 0,
                     BitValue::High => 1,
-                    b => return b.to_char()
+                    b => return b.to_char(),
                 }
             }
         }
@@ -243,7 +243,7 @@ impl SignalValue {
     pub fn width(&self) -> usize {
         match self {
             SignalValue::Literal(literal, _) => literal.len(),
-            SignalValue::Symbol(_) => 2
+            SignalValue::Symbol(_) => 2,
         }
     }
 
@@ -260,16 +260,16 @@ impl SignalValue {
                 for b in literal {
                     match b {
                         BitValue::HighZ
-                            | BitValue::Invalid
-                            | BitValue::Overflow
-                            | BitValue::Undefined
-                            | BitValue::Filtered => return true,
+                        | BitValue::Invalid
+                        | BitValue::Overflow
+                        | BitValue::Undefined
+                        | BitValue::Filtered => return true,
                         _ => {}
                     }
                 }
                 false
-            },
-            SignalValue::Symbol(_) => false
+            }
+            SignalValue::Symbol(_) => false,
         }
     }
 }
@@ -284,7 +284,7 @@ impl fmt::Display for SignalValue {
                         for b in literal.iter().rev() {
                             write!(f, "{}", b.to_char())?;
                         }
-                    },
+                    }
                     ValueFormat::Hex => {
                         write!(f, "h")?;
                         for nibble in NibbleValue::from_vec(literal).iter().rev() {
@@ -293,7 +293,7 @@ impl fmt::Display for SignalValue {
                     }
                 }
                 Ok(())
-            },
+            }
             SignalValue::Symbol(symbol) => {
                 write!(f, "{}", symbol)?;
                 Ok(())
@@ -315,9 +315,9 @@ impl PartialEq for SignalValue {
                     }
                 }
                 false
-            },
+            }
             (SignalValue::Symbol(self_s), SignalValue::Symbol(other_s)) => self_s == other_s,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -331,6 +331,9 @@ mod test {
     #[test]
     fn signal_eq() {
         assert_eq!(SignalValue::new(0), SignalValue::from_str("000").unwrap());
-        assert_eq!(SignalValue::new(42), SignalValue::from_str("000000101010").unwrap());
+        assert_eq!(
+            SignalValue::new(42),
+            SignalValue::from_str("000000101010").unwrap()
+        );
     }
 }

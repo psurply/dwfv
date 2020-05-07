@@ -8,7 +8,7 @@ lalrpop_mod!(parser, "/search/parser.rs");
 #[derive(Debug)]
 pub enum ValueAst {
     Literal(SignalValue),
-    Id(String)
+    Id(String),
 }
 
 #[derive(Debug)]

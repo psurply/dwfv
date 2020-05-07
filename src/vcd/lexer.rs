@@ -75,7 +75,7 @@ impl Token {
     }
 
     fn retokenize_value(word: &str) -> Option<Token> {
-        match word.chars().nth(0).unwrap() {
+        match word.chars().next().unwrap() {
             'b' => Some(Token::Value(SignalValue::from_str(&word[1..]).unwrap())),
             'x' | '-' | 'z' | 'u' | 'w' | '1' | '0' => Some(Token::ValueIdentifier(
                 SignalValue::from_str(&word[..1]).unwrap(),
@@ -87,7 +87,7 @@ impl Token {
     }
 
     fn retokenize_timestamp(word: &str) -> Option<Token> {
-        match word.chars().nth(0).unwrap() {
+        match word.chars().next().unwrap() {
             '#' => match word[1..].parse() {
                 Ok(i) => Some(Token::Timestamp(Timestamp::new(i))),
                 Err(_) => None,

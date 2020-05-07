@@ -9,7 +9,7 @@ use std::thread;
 pub struct AsyncSignalDB {
     /// Synchronous Signal Database
     pub sync_db: Arc<SignalDB>,
-    workers: Vec<thread::JoinHandle<()>>
+    workers: Vec<thread::JoinHandle<()>>,
 }
 
 impl Default for AsyncSignalDB {
@@ -30,7 +30,7 @@ impl AsyncSignalDB {
     pub fn new() -> Self {
         AsyncSignalDB {
             sync_db: Arc::new(SignalDB::new()),
-            workers: Vec::new()
+            workers: Vec::new(),
         }
     }
 
@@ -55,8 +55,10 @@ impl AsyncSignalDB {
     /// db.sync_db.wait_until_initialized();
     /// ```
     pub fn parse_vcd<I: io::BufRead>(&mut self, input: I)
-        where I: std::marker::Send,
-              I: 'static {
+    where
+        I: std::marker::Send,
+        I: 'static,
+    {
         let db_parse = Arc::clone(&self.sync_db);
         self.workers.push(thread::spawn(move || {
             let _ = db_parse.parse_vcd(input);
@@ -104,16 +106,13 @@ impl AsyncSignalDB {
         let expr = expr.to_string();
         self.workers.push(thread::spawn(move || {
             if let Err(e) = db_search.search_init(&expr) {
-                db_search.set_status(
-                    format!("Cannot initialize search: {}: {}", expr, e).as_str()
-                )
+                db_search.set_status(format!("Cannot initialize search: {}: {}", expr, e).as_str())
             };
             for timestamp in db_search.get_timestamps() {
                 if let Err(e) = db_search.search_at(&expr, timestamp) {
-                    db_search.set_status(
-                        format!("Invalid search expression: {}: {}", expr, e).as_str()
-                    );
-                    return
+                    db_search
+                        .set_status(format!("Invalid search expression: {}: {}", expr, e).as_str());
+                    return;
                 }
             }
             let _ = db_search.finish_search(&expr);

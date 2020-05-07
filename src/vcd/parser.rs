@@ -101,10 +101,39 @@ impl<'a, I: BufRead> Parser<'a, I> {
     fn parse_var(&mut self) -> Result<(), SyntaxError> {
         expect_token!(self, Context::Id, Token::Identifier(_var_type), {
             expect_token!(self, Context::Id, Token::Integer(var_width), {
-                expect_token!(self, Context::ShortId, Token::Identifier(var_short_ident), {
-                    match self.lexer.pop(Context::Id) {
-                        Token::Identifier(var_ident) => match self.lexer.pop(Context::IdRange) {
-                            Token::Range(_begin, _end) => {
+                expect_token!(
+                    self,
+                    Context::ShortId,
+                    Token::Identifier(var_short_ident),
+                    {
+                        match self.lexer.pop(Context::Id) {
+                            Token::Identifier(var_ident) => {
+                                match self.lexer.pop(Context::IdRange) {
+                                    Token::Range(_begin, _end) => expect_token!(
+                                        self,
+                                        Context::Stmt,
+                                        Token::Keyword(Keyword::End),
+                                        {
+                                            self.declare_new_var(Signal::new(
+                                                &var_short_ident,
+                                                &var_ident,
+                                                var_width,
+                                            ));
+                                            Ok(())
+                                        }
+                                    ),
+                                    Token::Keyword(Keyword::End) => {
+                                        self.declare_new_var(Signal::new(
+                                            &var_short_ident,
+                                            &var_ident,
+                                            var_width,
+                                        ));
+                                        Ok(())
+                                    }
+                                    _ => syntax_error!(self),
+                                }
+                            }
+                            Token::IdentifierRange(var_ident, _begin, _end) => {
                                 expect_token!(self, Context::Stmt, Token::Keyword(Keyword::End), {
                                     self.declare_new_var(Signal::new(
                                         &var_short_ident,
@@ -114,29 +143,10 @@ impl<'a, I: BufRead> Parser<'a, I> {
                                     Ok(())
                                 })
                             }
-                            Token::Keyword(Keyword::End) => {
-                                self.declare_new_var(Signal::new(
-                                    &var_short_ident,
-                                    &var_ident,
-                                    var_width,
-                                ));
-                                Ok(())
-                            }
                             _ => syntax_error!(self),
-                        },
-                        Token::IdentifierRange(var_ident, _begin, _end) => {
-                            expect_token!(self, Context::Stmt, Token::Keyword(Keyword::End), {
-                                self.declare_new_var(Signal::new(
-                                    &var_short_ident,
-                                    &var_ident,
-                                    var_width,
-                                ));
-                                Ok(())
-                            })
                         }
-                        _ => syntax_error!(self),
                     }
-                })
+                )
             })
         })
     }
@@ -154,9 +164,7 @@ impl<'a, I: BufRead> Parser<'a, I> {
     fn parse_dumpvars(&mut self) -> Result<(), SyntaxError> {
         loop {
             match self.lexer.pop(Context::Value) {
-                Token::Value(v) => {
-                    self.parse_value_change(v)?
-                }
+                Token::Value(v) => self.parse_value_change(v)?,
                 Token::ValueIdentifier(v, i) => {
                     self.signaldb
                         .set_current_value(&i, v)
@@ -181,14 +189,13 @@ impl<'a, I: BufRead> Parser<'a, I> {
         loop {
             match self.lexer.pop(Context::Stmt) {
                 Token::Keyword(kw) => match kw {
-                    Keyword::Comment
-                    | Keyword::Date
-                    | Keyword::Version
-                    | Keyword::Timescale => self.parse_comment()?,
+                    Keyword::Comment | Keyword::Date | Keyword::Version | Keyword::Timescale => {
+                        self.parse_comment()?
+                    }
                     Keyword::EndDefinitions => {
                         self.signaldb.mark_as_initialized();
                         self.parse_comment()?
-                    },
+                    }
                     Keyword::DumpVars => self.parse_dumpvars()?,
                     Keyword::Scope => self.parse_scope()?,
                     Keyword::Var => self.parse_var()?,

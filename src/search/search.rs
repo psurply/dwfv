@@ -3,13 +3,13 @@ use super::expr::{ExprAst, ValueAst};
 use crate::signaldb::{SignalDB, SignalValue, TimeDescr, Timestamp};
 use std::error::Error;
 use std::io;
-use std::ops::{BitOr, BitAnd};
+use std::ops::{BitAnd, BitOr};
 
 pub struct Search {
     findings: Vec<TimeDescr>,
     expr: ExprAst,
     current_period: Option<Timestamp>,
-    cursor: Option<Timestamp>
+    cursor: Option<Timestamp>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -51,10 +51,7 @@ impl BitOr for EvalResult {
         } else {
             ExprType::Level
         };
-        EvalResult {
-            result,
-            ty
-        }
+        EvalResult { result, ty }
     }
 }
 
@@ -68,10 +65,7 @@ impl BitAnd for EvalResult {
         } else {
             ExprType::Level
         };
-        EvalResult {
-            result,
-            ty
-        }
+        EvalResult { result, ty }
     }
 }
 
@@ -98,7 +92,7 @@ impl Search {
             expr: ExprAst::from_str(expr)?,
             findings: Vec::new(),
             current_period: None,
-            cursor: Some(Timestamp::new(0))
+            cursor: Some(Timestamp::new(0)),
         };
         Ok(search)
     }
@@ -111,7 +105,7 @@ impl Search {
     ) -> Result<SignalValue, Box<dyn Error>> {
         let res = match value {
             ValueAst::Literal(v) => v.clone(),
-            ValueAst::Id(id) => signaldb.value_at(id, timestamp)?.clone(),
+            ValueAst::Id(id) => signaldb.value_at(id, timestamp)?,
         };
         Ok(res)
     }
@@ -165,15 +159,8 @@ impl Search {
             ExprAst::Not(e) => {
                 let er = self.eval_at(e, signaldb, timestamp)?;
                 let result = !er.result;
-                let ty = if result {
-                    er.ty
-                } else {
-                    ExprType::Level
-                };
-                EvalResult {
-                    result,
-                    ty
-                }
+                let ty = if result { er.ty } else { ExprType::Level };
+                EvalResult { result, ty }
             }
             ExprAst::After(t) => EvalResult {
                 result: timestamp > Timestamp::new(*t),
@@ -192,16 +179,19 @@ impl Search {
         self.current_period = None;
         for timestamp in signaldb.get_timestamps() {
             self.search_at(signaldb, timestamp)?
-        };
+        }
         self.finish();
         Ok(())
     }
 
-    pub fn search_at(&mut self, signaldb: &SignalDB, timestamp: Timestamp)
-        -> Result<(), Box<dyn Error>>{
+    pub fn search_at(
+        &mut self,
+        signaldb: &SignalDB,
+        timestamp: Timestamp,
+    ) -> Result<(), Box<dyn Error>> {
         if let Some(cursor) = self.cursor {
             if timestamp < cursor {
-                return Ok(())
+                return Ok(());
             }
         }
         let res = self.eval_at(&self.expr, signaldb, timestamp)?;
@@ -236,17 +226,15 @@ impl Search {
     }
 
     fn search_finding(&self, timestamp: Timestamp) -> Result<usize, usize> {
-        self.findings.binary_search_by_key(&timestamp, |t| {
-            match t {
-                TimeDescr::Point(p) => *p,
-                TimeDescr::Period(begin, end) => {
-                    if *begin <= timestamp && timestamp < *end {
-                        timestamp
-                    } else if timestamp <= *begin {
-                        *begin
-                    } else {
-                        *end - Timestamp::new(1)
-                    }
+        self.findings.binary_search_by_key(&timestamp, |t| match t {
+            TimeDescr::Point(p) => *p,
+            TimeDescr::Period(begin, end) => {
+                if *begin <= timestamp && timestamp < *end {
+                    timestamp
+                } else if timestamp <= *begin {
+                    *begin
+                } else {
+                    *end - Timestamp::new(1)
                 }
             }
         })
@@ -255,21 +243,21 @@ impl Search {
     pub fn findings_between(&self, begin: Timestamp, end: Timestamp) -> FindingsSummary {
         if let Some(current_period) = self.current_period {
             if begin <= current_period && current_period < end {
-                    return FindingsSummary::RangeBegin
+                return FindingsSummary::RangeBegin;
             }
 
             if let Some(cursor) = self.cursor {
                 if current_period <= begin && end <= cursor {
-                    return FindingsSummary::Range
+                    return FindingsSummary::Range;
                 }
             } else if current_period <= begin {
-                return FindingsSummary::Range
+                return FindingsSummary::Range;
             }
         }
 
         let seek = (
             self.search_finding(begin - Timestamp::new(1)),
-            self.search_finding(end - Timestamp::new(1))
+            self.search_finding(end - Timestamp::new(1)),
         );
 
         match seek {
@@ -279,119 +267,115 @@ impl Search {
                 } else if ei - bi == 1 {
                     match self.findings.get(bi).unwrap() {
                         TimeDescr::Period(_, _) => FindingsSummary::Complex(1),
-                        TimeDescr::Point(_) => FindingsSummary::Timestamp
+                        TimeDescr::Point(_) => FindingsSummary::Timestamp,
                     }
                 } else {
                     FindingsSummary::Complex(ei - bi)
                 }
-            },
-            (Ok(bi), Err(_)) => {
-                match self.findings.get(bi).unwrap() {
-                    TimeDescr::Point(_) => FindingsSummary::Nothing,
-                    _ => FindingsSummary::RangeEnd
-                }
-            },
-            (Err(_), Ok(ei)) => {
-                match self.findings.get(ei).unwrap() {
-                    TimeDescr::Period(b, e) => {
-                        if *b == end {
-                            FindingsSummary::Nothing
-                        } else if *e < end {
-                            FindingsSummary::RangeEnd
-                        } else {
-                            FindingsSummary::RangeBegin
-                        }
-                    },
-                    TimeDescr::Point(_) => FindingsSummary::Timestamp,
-                }
-            },
-            (Ok(bi), Ok(ei)) => {
-                match self.findings.get(bi).unwrap() {
-                    TimeDescr::Period(b, _) => {
-                        if *b == begin {
-                            FindingsSummary::RangeBegin
-                        } else if ei == bi {
-                            FindingsSummary::Range
-                        } else {
-                            FindingsSummary::Complex(ei - bi)
-                        }
-                    },
-                    _ => FindingsSummary::Complex(ei - bi)
-                }
             }
+            (Ok(bi), Err(_)) => match self.findings.get(bi).unwrap() {
+                TimeDescr::Point(_) => FindingsSummary::Nothing,
+                _ => FindingsSummary::RangeEnd,
+            },
+            (Err(_), Ok(ei)) => match self.findings.get(ei).unwrap() {
+                TimeDescr::Period(b, e) => {
+                    if *b == end {
+                        FindingsSummary::Nothing
+                    } else if *e < end {
+                        FindingsSummary::RangeEnd
+                    } else {
+                        FindingsSummary::RangeBegin
+                    }
+                }
+                TimeDescr::Point(_) => FindingsSummary::Timestamp,
+            },
+            (Ok(bi), Ok(ei)) => match self.findings.get(bi).unwrap() {
+                TimeDescr::Period(b, _) => {
+                    if *b == begin {
+                        FindingsSummary::RangeBegin
+                    } else if ei == bi {
+                        FindingsSummary::Range
+                    } else {
+                        FindingsSummary::Complex(ei - bi)
+                    }
+                }
+                _ => FindingsSummary::Complex(ei - bi),
+            },
         }
     }
 
     pub fn get_next_finding(&self, from: Timestamp) -> Option<Timestamp> {
         let index = match self.search_finding(from) {
             Ok(index) => index + 1,
-            Err(index) => index
+            Err(index) => index,
         };
-        self.findings.get(index).map(|x| {
-            match x {
+        self.findings
+            .get(index)
+            .map(|x| match x {
                 TimeDescr::Point(t) => *t,
-                TimeDescr::Period(t, _) => *t
-            }
-        }).or_else(|| {
-            self.current_period.and_then(|current_period| {
-                if current_period > from {
-                    Some(current_period)
-                } else {
-                    None
-                }
+                TimeDescr::Period(t, _) => *t,
             })
-        })
+            .or_else(|| {
+                self.current_period.and_then(|current_period| {
+                    if current_period > from {
+                        Some(current_period)
+                    } else {
+                        None
+                    }
+                })
+            })
     }
 
     pub fn get_end_of_next_finding(&self, from: Timestamp) -> Option<Timestamp> {
         let index = match self.search_finding(from) {
             Ok(index) => index + 1,
-            Err(index) => index
+            Err(index) => index,
         };
-        self.findings.get(index).map(|x| {
-            match x {
-                TimeDescr::Point(t) => *t,
-                TimeDescr::Period(_, t) => *t
-            }
+        self.findings.get(index).map(|x| match x {
+            TimeDescr::Point(t) => *t,
+            TimeDescr::Period(_, t) => *t,
         })
     }
 
     pub fn get_previous_finding(&self, from: Timestamp) -> Option<Timestamp> {
         let index = match self.search_finding(from - Timestamp::new(1)) {
             Ok(index) => index,
-            Err(index) => if index > 0 { index - 1 } else { index }
-        };
-        self.findings.get(index).map(|x| {
-            match x {
-                TimeDescr::Point(t) => *t,
-                TimeDescr::Period(t, _) => *t
-            }
-        }).or_else(|| {
-            self.current_period.and_then(|current_period| {
-                if current_period < from {
-                    Some(current_period)
+            Err(index) => {
+                if index > 0 {
+                    index - 1
                 } else {
-                    None
+                    index
                 }
+            }
+        };
+        self.findings
+            .get(index)
+            .map(|x| match x {
+                TimeDescr::Point(t) => *t,
+                TimeDescr::Period(t, _) => *t,
             })
-        })
+            .or_else(|| {
+                self.current_period.and_then(|current_period| {
+                    if current_period < from {
+                        Some(current_period)
+                    } else {
+                        None
+                    }
+                })
+            })
     }
 
     pub fn get_first_finding(&self) -> Option<Timestamp> {
-        self.findings.first().map(|x| {
-            match x {
-                TimeDescr::Point(t) => *t,
-                TimeDescr::Period(t, _) => *t
-            }
+        self.findings.first().map(|x| match x {
+            TimeDescr::Point(t) => *t,
+            TimeDescr::Period(t, _) => *t,
         })
     }
 
     pub fn get_last_finding(&self) -> Option<Timestamp> {
-        self.findings.last().map(|x| {
-            match x {
-                TimeDescr::Point(t) => *t,
-                TimeDescr::Period(_, t) => *t
-            }
+        self.findings.last().map(|x| match x {
+            TimeDescr::Point(t) => *t,
+            TimeDescr::Period(_, t) => *t,
         })
     }
 }

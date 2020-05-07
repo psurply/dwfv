@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-use crate::search::search::FindingsSummary;
 use super::symbols::block;
+use crate::search::search::FindingsSummary;
 use tuirs::buffer::Buffer;
 use tuirs::layout::Rect;
 use tuirs::style::{Color, Style};
@@ -28,7 +28,7 @@ impl<'a> SearchBar<'a> {
             name,
             selected,
             cursor,
-            visual_cursor
+            visual_cursor,
         }
     }
 
@@ -64,13 +64,14 @@ impl<'a> Widget for SearchBar<'a> {
             } else if self.selected {
                 Color::LightYellow
             } else {
-                    Color::Yellow
+                Color::Yellow
             };
             let bg = if i == self.cursor {
                 Color::Gray
             } else if let Some(visual_cursor) = self.visual_cursor {
-                if (visual_cursor <= i && i <= self.cursor) ||
-                    (self.cursor <= i && i <= visual_cursor) {
+                if (visual_cursor <= i && i <= self.cursor)
+                    || (self.cursor <= i && i <= visual_cursor)
+                {
                     Color::Blue
                 } else {
                     Color::Black

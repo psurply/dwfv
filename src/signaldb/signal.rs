@@ -265,7 +265,7 @@ impl Signal {
     ///
     /// [`get_next_rising_edge`]: #method.get_next_rising_edge
     pub fn get_first_event(&self) -> Option<Timestamp> {
-        self.events.first().map(|evt| { evt.timestamp })
+        self.events.first().map(|evt| evt.timestamp)
     }
 
     /// Get the timestamp of the last event.
@@ -276,7 +276,7 @@ impl Signal {
     ///
     /// [`get_next_rising_edge`]: #method.get_next_rising_edge
     pub fn get_last_event(&self) -> Option<Timestamp> {
-        self.events.last().map(|evt| { evt.timestamp })
+        self.events.last().map(|evt| evt.timestamp)
     }
 
     /// Format some stats of the signal.

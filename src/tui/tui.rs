@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
+use super::app::App;
 use crate::signaldb::AsyncSignalDB;
 use std::error::Error;
 use std::io;
 use std::path::Path;
-use super::app::App;
 use termion::input::MouseTerminal;
 use termion::raw::{IntoRawMode, RawTerminal};
 use tuirs::backend::TermionBackend;
