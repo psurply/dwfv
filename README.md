@@ -24,7 +24,7 @@ Installation
 ------------
 
 ```shell
-$ cargo dwfv
+$ cargo install dwfv
 ```
 
 From sources:
