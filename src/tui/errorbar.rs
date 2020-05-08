@@ -16,7 +16,7 @@ impl ErrorBar {
 }
 
 impl Widget for ErrorBar {
-    fn draw(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         let style = Style::default().fg(Color::White).bg(if self.selected {
             Color::LightRed
         } else {

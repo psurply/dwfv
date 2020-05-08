@@ -1,8 +1,8 @@
 [package]
 name = "dwfv"
-version = "0.2.0"
+version = "0.2.1"
 description = "A simple digital waveform viewer with vi-like key bindings"
-authors = ["Pierre Surply <pierre.surply@lse.epita.fr>"]
+authors = ["Pierre Surply <pierre.surply@gmail.com>"]
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/psurply/dwfv"
@@ -24,12 +24,12 @@ exclude = [
 travis-ci = { repository = "psurply/dwfv" }
 
 [build-dependencies]
-lalrpop = { version = "0", features = ["lexer"] }
+lalrpop = { version = "0.18", features = ["lexer"] }
 
 [dependencies]
 clap = "2"
-lalrpop-util = "0"
+lalrpop-util = "0.18"
 lazy_static = "1"
 regex = "1"
-tui = "0.5"
+tui = "0.9"
 termion = "1.5"

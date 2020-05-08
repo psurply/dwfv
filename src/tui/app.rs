@@ -19,7 +19,6 @@ use std::str::FromStr;
 use tuirs::backend::Backend;
 use tuirs::layout::Rect;
 use tuirs::terminal::Frame;
-use tuirs::widgets::Widget;
 
 const MAX_ZOOM: i64 = 1 << 48;
 const HELP_MSG: &str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /,f:Search  o:Edit  \
@@ -187,7 +186,7 @@ impl App {
         }
         let value = self.signaldb.sync_db.value_at(signal_id, self.cursor.x)?;
         let fullname = self.signaldb.sync_db.get_signal_fullname(signal_id)?;
-        Waveform::new(
+        let waveform = Waveform::new(
             format!(
                 "{}{}: {} = {}",
                 if selected { "> " } else { "" },
@@ -199,8 +198,8 @@ impl App {
             selected,
             self.get_relative_cursor_x(),
             self.get_relative_visual_cursor_x(),
-        )
-        .render(f, rect);
+        );
+        f.render_widget(waveform, rect);
         Ok(())
     }
 
@@ -216,15 +215,26 @@ impl App {
             let (begin, end) = self.get_time_range(i);
             data.push(self.signaldb.sync_db.findings_between(expr, begin, end)?)
         }
-        SearchBar::new(
+        let search_bar = SearchBar::new(
             format!("{}{}", if selected { "-> " } else { "" }, expr),
             &data[..],
             selected,
             self.get_relative_cursor_x(),
             self.get_relative_visual_cursor_x(),
-        )
-        .render(f, rect);
+        );
+        f.render_widget(search_bar, rect);
         Ok(())
+    }
+
+    fn render_error<B: Backend>(
+        &mut self,
+        f: &mut Frame<B>,
+        rect: Rect,
+        msg: String,
+        selected: bool,
+    ) {
+        let error_bar = ErrorBar::new(msg, selected);
+        f.render_widget(error_bar, rect);
     }
 
     fn render_instr<B: Backend>(
@@ -238,7 +248,7 @@ impl App {
             TuiInstr::Signal(id) => self.render_waveform(f, rect, id, selected)?,
             TuiInstr::Search(expr) => self.render_search(f, rect, expr, selected)?,
             TuiInstr::Error(line, err) => {
-                ErrorBar::new(format!("{}: {}", line, err), selected).render(f, rect)
+                self.render_error(f, rect, format!("{}: {}", line, err), selected)
             }
         }
         Ok(())
@@ -254,20 +264,20 @@ impl App {
             match self.alloc_rect_instr(area, TuiInstr::height(instr) as u16) {
                 Ok(instr_rect) => match self.render_instr(f, instr_rect, &instr, selected) {
                     Ok(_) => (),
-                    Err(err) => ErrorBar::new(format!("{}", err), selected).render(f, instr_rect),
+                    Err(err) => self.render_error(f, instr_rect, format!("{}", err), selected),
                 },
                 Err(_) => scrollable = true,
             }
         }
         let last_instr = Rect::new(self.area.x, self.height + 1, self.area.width, 1);
-        CursorBar::new(
+        let cursor_bar = CursorBar::new(
             CursorType::Bottom,
             self.cursor.x,
             self.scale,
             self.get_relative_cursor_x(),
             scrollable,
-        )
-        .render(f, last_instr)
+        );
+        f.render_widget(cursor_bar, last_instr)
     }
 
     fn adjust_window(&mut self) {
@@ -360,20 +370,22 @@ impl App {
         self.height = 0;
         self.adjust_window();
 
-        CursorBar::new(
+        let cursor_bar = CursorBar::new(
             CursorType::Top,
             self.cursor.x,
             self.scale,
             self.get_relative_cursor_x(),
             self.window.y > 0,
-        )
-        .render(f, header);
+        );
+        f.render_widget(cursor_bar, header);
+
         self.render_instrs(f);
+
         let status = self.signaldb.sync_db.get_status();
         if !status.is_empty() {
             self.set_status("")
         };
-        StatusBar::new(
+        let status_bar = StatusBar::new(
             if self.events.in_visual_mode() {
                 format!(
                     "-- VISUAL -- ({})  Enter:Zoom Fit  hjkl:Move  Esc:Abort",
@@ -395,8 +407,8 @@ impl App {
             } else {
                 "".to_string()
             },
-        )
-        .render(f, footer)
+        );
+        f.render_widget(status_bar, footer)
     }
 
     pub fn edit(&mut self) {

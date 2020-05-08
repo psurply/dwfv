@@ -38,7 +38,7 @@ impl CursorBar {
 }
 
 impl Widget for CursorBar {
-    fn draw(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         let style = Style::default().fg(Color::Gray).bg(Color::Black);
 
         for i in 0..area.width {

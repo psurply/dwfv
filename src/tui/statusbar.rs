@@ -19,7 +19,7 @@ impl StatusBar {
 }
 
 impl Widget for StatusBar {
-    fn draw(&mut self, area: Rect, buf: &mut Buffer) {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         let style = Style::default()
             .fg(Color::White)
             .bg(Color::DarkGray)
