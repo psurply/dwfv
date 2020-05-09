@@ -266,7 +266,10 @@ impl App {
                     Ok(_) => (),
                     Err(err) => self.render_error(f, instr_rect, format!("{}", err), selected),
                 },
-                Err(_) => scrollable = true,
+                Err(_) => {
+                    scrollable = true;
+                    break;
+                }
             }
         }
         let last_instr = Rect::new(self.area.x, self.height + 1, self.area.width, 1);
