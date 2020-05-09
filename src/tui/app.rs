@@ -325,8 +325,8 @@ impl App {
         let height = self.get_current_instr_height();
         let middle = self.window.y + height / 2;
         match middle.cmp(&self.cursor.y) {
-            Ordering::Greater => self.window.y += self.cursor.y - middle,
-            Ordering::Less => {
+            Ordering::Less => self.window.y += self.cursor.y - middle,
+            Ordering::Greater => {
                 let shift = middle - self.cursor.y;
                 if self.window.y > shift {
                     self.window.y -= shift
