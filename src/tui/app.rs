@@ -455,7 +455,7 @@ impl App {
     fn update_layout_list(&mut self, layout: Vec<TuiInstr>) {
         if layout.is_empty() {
             self.set_status("Layout cannot be empty");
-            return
+            return;
         }
         let mut reviewed_layout = Vec::new();
         for instr in layout.iter() {

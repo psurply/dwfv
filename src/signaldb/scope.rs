@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+use super::signal::Signal;
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
@@ -11,6 +12,7 @@ pub enum ScopeChild {
 pub struct Scope {
     pub name: String,
     children: BTreeMap<String, ScopeChild>,
+    path: Vec<String>,
 }
 
 impl Scope {
@@ -18,6 +20,7 @@ impl Scope {
         Scope {
             name,
             children: BTreeMap::new(),
+            path: Vec::new(),
         }
     }
 
@@ -27,6 +30,8 @@ impl Scope {
                 Some(_) => self.get_scope(*name).unwrap().add_scope(&path[1..]),
                 None => {
                     let mut s = Scope::new(name.to_string());
+                    s.path = self.path.clone();
+                    s.path.push(self.name.clone());
                     s.add_scope(&path[1..]);
                     self.children.insert(s.name.clone(), ScopeChild::Scope(s));
                 }
@@ -55,8 +60,10 @@ impl Scope {
         }
     }
 
-    pub fn add_signal(&mut self, signal_id: String) {
-        self.children.insert(signal_id, ScopeChild::Signal);
+    pub fn add_signal(&mut self, signal: &mut Signal) {
+        self.children.insert(signal.id.clone(), ScopeChild::Signal);
+        signal.path = self.path.clone();
+        signal.path.push(self.name.clone())
     }
 
     fn _traverse<T, F: FnMut(&str, &ScopeChild, u64) -> T>(&self, depth: u64, f: &mut F) {

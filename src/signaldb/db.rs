@@ -453,18 +453,17 @@ impl SignalDB {
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal)
     /// ```
-    pub fn declare_signal(&self, scope: &[&str], signal: Signal) {
-        let signal_id = signal.id.clone();
-        {
-            let mut signals = self.signals.lock().unwrap();
-            signals.insert(signal.id.clone(), signal);
-        }
+    pub fn declare_signal(&self, scope: &[&str], mut signal: Signal) {
         {
             let mut scopes = self.scope.lock().unwrap();
             match scopes.get_scope_by_path(scope) {
-                Some(scope) => scope.add_signal(signal_id),
+                Some(scope) => scope.add_signal(&mut signal),
                 None => panic!("Scope {:?} is not defined", scope),
             }
+        }
+        {
+            let mut signals = self.signals.lock().unwrap();
+            signals.insert(signal.id.clone(), signal);
         }
     }
 
@@ -655,15 +654,14 @@ impl SignalDB {
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
     ///
-    /// assert_eq!(db.get_signal_fullname("0").unwrap(), "baz");
+    /// assert_eq!(db.get_signal_fullname("0").unwrap(), "foo.bar.baz[:32]");
     /// ```
     pub fn get_signal_fullname(&self, signal_id: &str) -> Result<String, SignalNotFound> {
         let signals = self.signals.lock().unwrap();
         Ok(signals
             .get(signal_id)
             .ok_or_else(|| SignalNotFound::new(signal_id))?
-            .name
-            .to_string())
+            .get_fullname())
     }
 
     /// Check that a signal exists in the `SignalDB`.

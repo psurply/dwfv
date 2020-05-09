@@ -20,6 +20,7 @@ pub struct Signal {
     pub width: usize,
     events: Vec<Event>,
     default: SignalValue,
+    pub path: Vec<String>,
 }
 
 impl Signal {
@@ -41,6 +42,7 @@ impl Signal {
             width,
             events: Vec::new(),
             default: SignalValue::new_default(width, BitValue::Undefined),
+            path: Vec::new(),
         }
     }
 
@@ -337,6 +339,31 @@ impl Signal {
             None => ("=", self.value_at(timestamp)),
         };
         let _ = writeln!(output, "{} {} {}", self, assign_symbol, value);
+    }
+
+    /// Construct the fullname of the signal.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dwfv::signaldb::{Signal, SignalDB};
+    /// let mut signal = Signal::new("0", "foo", 32);
+    ///
+    /// assert_eq!(signal.get_fullname(), "foo[:32]")
+    /// ```
+    pub fn get_fullname(&self) -> String {
+        format!("{}{}{}",
+            if !self.path.is_empty() {
+                format!("{}.", self.path[1..].join("."))
+            } else {
+                String::new()
+            },
+            self.name,
+            if self.width > 1 {
+                format!("[:{}]", self.width)
+            } else {
+                String::new()
+            })
     }
 }
 
