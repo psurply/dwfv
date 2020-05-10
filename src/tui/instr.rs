@@ -78,3 +78,14 @@ impl fmt::Display for TuiInstr {
         Ok(())
     }
 }
+
+impl PartialEq for TuiInstr {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (TuiInstr::Signal(a), TuiInstr::Signal(b)) => a == b,
+            (TuiInstr::Search(a), TuiInstr::Search(b)) => a == b,
+            (TuiInstr::Error(la, ma), TuiInstr::Error(lb, mb)) => la == lb && ma == mb,
+            _ => false,
+        }
+    }
+}

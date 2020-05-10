@@ -721,9 +721,34 @@ impl App {
     }
 
     fn show_clipboard(&mut self) {
+        fn format_instr(buf: &mut String, instr: &TuiInstr, counter: usize) {
+            if counter > 1 {
+                buf.push_str(&format!("{} (x{}), ", instr, counter))
+            } else {
+                buf.push_str(&format!("{}, ", instr))
+            }
+        };
+
         let mut s = String::new();
-        for element in self.clipboard.iter().rev() {
-            s.push_str(&format!("{}, ", element))
+        let mut counter = 1;
+        let mut prev_instr_opt = None;
+
+        for instr in self.clipboard.iter().rev() {
+            if let Some(prev_instr) = &prev_instr_opt {
+                if *prev_instr == *instr {
+                    counter += 1
+                } else {
+                    format_instr(&mut s, &prev_instr, counter);
+                    counter = 1;
+                    prev_instr_opt = Some(instr.clone())
+                }
+            } else {
+                prev_instr_opt = Some(instr.clone())
+            }
+        }
+
+        if let Some(prev_instr) = prev_instr_opt {
+            format_instr(&mut s, &prev_instr, counter);
         }
         s.push_str("EOS");
         self.set_status(&s);
