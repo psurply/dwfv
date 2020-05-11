@@ -509,11 +509,9 @@ impl SignalDB {
     /// ```
     pub fn set_time(&self, timestamp: Timestamp) {
         let mut now = self.now.lock().unwrap();
-        if timestamp > *now {
-            let mut timestamps = self.timestamps.lock().unwrap();
-            timestamps.push(timestamp);
-            *now = timestamp;
-        };
+        let mut timestamps = self.timestamps.lock().unwrap();
+        timestamps.push(timestamp);
+        *now = timestamp;
     }
 
     /// Set the value of a signal at the current time.
