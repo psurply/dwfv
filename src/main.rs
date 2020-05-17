@@ -3,7 +3,7 @@ extern crate clap;
 extern crate dwfv;
 
 use clap::{crate_description, crate_version, App, Arg, ArgMatches, SubCommand};
-use dwfv::signaldb::{AsyncSignalDB, SignalDB, Timestamp};
+use dwfv::signaldb::{AsyncSignalDB, SignalDB};
 use dwfv::tui::Tui;
 use std::error::Error;
 use std::fs::File;
@@ -25,7 +25,6 @@ fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
             .map_err(|_| {
                 io::Error::new(io::ErrorKind::InvalidInput, "TIMESTAMP must be an integer")
             })?;
-        let timestamp = Timestamp::new(timestamp);
         let db = SignalDB::from_vcd_with_limit(buf_reader, Some(timestamp))?;
         db.format_values_at(&mut io::stdout(), timestamp);
     } else if let Some(matches) = args.subcommand_matches("when") {

@@ -92,7 +92,7 @@ impl Search {
             expr: ExprAst::from_str(expr)?,
             findings: Vec::new(),
             current_period: None,
-            cursor: Some(Timestamp::new(0)),
+            cursor: Some(Timestamp::origin()),
         };
         Ok(search)
     }
@@ -163,11 +163,11 @@ impl Search {
                 EvalResult { result, ty }
             }
             ExprAst::After(t) => EvalResult {
-                result: timestamp > Timestamp::new(*t),
+                result: timestamp > timestamp.derive(*t),
                 ty: ExprType::Level,
             },
             ExprAst::Before(t) => EvalResult {
-                result: timestamp < Timestamp::new(*t),
+                result: timestamp < timestamp.derive(*t),
                 ty: ExprType::Level,
             },
         };
@@ -234,7 +234,7 @@ impl Search {
                 } else if timestamp <= *begin {
                     *begin
                 } else {
-                    *end - Timestamp::new(1)
+                    *end - end.derive(1)
                 }
             }
         })
@@ -256,8 +256,8 @@ impl Search {
         }
 
         let seek = (
-            self.search_finding(begin - Timestamp::new(1)),
-            self.search_finding(end - Timestamp::new(1)),
+            self.search_finding(begin - begin.derive(1)),
+            self.search_finding(end - end.derive(1)),
         );
 
         match seek {
@@ -338,7 +338,7 @@ impl Search {
     }
 
     pub fn get_previous_finding(&self, from: Timestamp) -> Option<Timestamp> {
-        let index = match self.search_finding(from - Timestamp::new(1)) {
+        let index = match self.search_finding(from - from.derive(1)) {
             Ok(index) => index,
             Err(index) => {
                 if index > 0 {

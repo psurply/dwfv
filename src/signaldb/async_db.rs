@@ -70,7 +70,7 @@ impl AsyncSignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{AsyncSignalDB, Timestamp};
+    /// use dwfv::signaldb::{AsyncSignalDB, Scale, Timestamp};
     /// let vcd = std::io::Cursor::new("
     /// $scope module logic $end
     /// $var wire 1 # foo $end
@@ -96,7 +96,7 @@ impl AsyncSignalDB {
     /// // Wait for the search process to find something
     /// loop {
     ///     if let Some(timestamp) = db.sync_db.get_first_finding(expr).unwrap_or(None) {
-    ///         assert_eq!(timestamp, Timestamp::new(42));
+    ///         assert_eq!(timestamp, Timestamp::new(42, Scale::Picosecond));
     ///         break
     ///     }
     /// }

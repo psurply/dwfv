@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 use super::lexer::{Context, Keyword, Lexer, Token};
-use crate::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
+use crate::signaldb::{Scale, Signal, SignalDB, SignalValue, Timestamp};
 use std::error::Error;
 use std::fmt;
 use std::io::prelude::*;
@@ -9,7 +9,7 @@ pub struct Parser<'a, I: BufRead> {
     lexer: Lexer<I>,
     signaldb: &'a SignalDB,
     scope: Vec<String>,
-    limit: Option<Timestamp>,
+    limit: Option<i64>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -181,17 +181,34 @@ impl<'a, I: BufRead> Parser<'a, I> {
         }
     }
 
-    pub fn set_limit(&mut self, timestamp: Timestamp) {
+    fn parse_timescale(&mut self) -> Result<Timestamp, SyntaxError> {
+        match self.lexer.pop(Context::Timescale) {
+            Token::Integer(times) => {
+                expect_token!(self, Context::Timescale, Token::Timescale(new_timescale), {
+                    expect_token!(self, Context::Timescale, Token::Keyword(Keyword::End), {
+                        Ok(new_timescale * times as i64)
+                    })
+                })
+            },
+            Token::Timescale(new_timescale) => {
+                expect_token!(self, Context::Timescale, Token::Keyword(Keyword::End), {
+                    Ok(new_timescale)
+                })
+            },
+            _ => syntax_error!(self),
+        }
+    }
+
+    pub fn set_limit(&mut self, timestamp: i64) {
         self.limit = Some(timestamp)
     }
 
     pub fn parse(&mut self) -> Result<(), SyntaxError> {
+        let mut timescale = Timestamp::new(1, Scale::Picosecond);
         loop {
             match self.lexer.pop(Context::Stmt) {
                 Token::Keyword(kw) => match kw {
-                    Keyword::Comment | Keyword::Date | Keyword::Version | Keyword::Timescale => {
-                        self.parse_comment()?
-                    }
+                    Keyword::Comment | Keyword::Date | Keyword::Version => self.parse_comment()?,
                     Keyword::EndDefinitions => {
                         self.signaldb.mark_as_initialized();
                         self.parse_comment()?
@@ -200,12 +217,17 @@ impl<'a, I: BufRead> Parser<'a, I> {
                     Keyword::Scope => self.parse_scope()?,
                     Keyword::Var => self.parse_var()?,
                     Keyword::Upscope => self.parse_upscope()?,
+                    Keyword::Timescale => {
+                        timescale = self.parse_timescale()?;
+                        self.signaldb.set_timescale(timescale)
+                    }
                     _ => break syntax_error!(self),
                 },
-                Token::Timestamp(t) => {
+                Token::Timestamp(v) => {
+                    let t = timescale * v;
                     self.signaldb.set_time(t);
                     if let Some(limit) = self.limit {
-                        if t > limit {
+                        if v > limit {
                             break Ok(());
                         }
                     }
@@ -270,7 +292,7 @@ $end
 $comment
    Any comment text.
 $end
-$timescale 1ps $end
+$timescale 100ps $end
 $scope module logic $end
 $var wire 8 # data[7:0] $end
 $var wire 8 # data_test [7:0] $end

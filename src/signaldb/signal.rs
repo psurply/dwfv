@@ -64,9 +64,9 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 32);
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(1337));
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(1337));
     /// ```
     pub fn add_event(&mut self, timestamp: Timestamp, mut new_value: SignalValue) {
         new_value.expand(self.width);
@@ -109,10 +109,10 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 32);
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(1337));
-    /// assert_eq!(signal.value_at(Timestamp::new(43)), SignalValue::new(1337));
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(1337));
+    /// assert_eq!(signal.value_at(Timestamp::new(43, Scale::Picosecond)), SignalValue::new(1337));
     /// ```
     pub fn value_at(&self, timestamp: Timestamp) -> SignalValue {
         let seek = self
@@ -130,11 +130,14 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 32);
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(1337));
-    /// assert_eq!(signal.event_at(Timestamp::new(42)).unwrap(), SignalValue::new(1337));
-    /// assert_eq!(signal.event_at(Timestamp::new(43)).is_none(), true);
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(1337));
+    /// assert_eq!(
+    ///     signal.event_at(Timestamp::new(42, Scale::Picosecond)).unwrap(),
+    ///     SignalValue::new(1337)
+    /// );
+    /// assert_eq!(signal.event_at(Timestamp::new(43, Scale::Picosecond)).is_none(), true);
     /// ```
     pub fn event_at(&self, timestamp: Timestamp) -> Option<SignalValue> {
         let seek = self
@@ -163,13 +166,15 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 32);
-    /// signal.add_event(Timestamp::new(0), SignalValue::new(0));
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(1337));
-    /// signal.add_event(Timestamp::new(43), SignalValue::new(1338));
+    /// signal.add_event(Timestamp::new(0, Scale::Picosecond), SignalValue::new(0));
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(1337));
+    /// signal.add_event(Timestamp::new(43, Scale::Picosecond), SignalValue::new(1338));
     /// assert_eq!(
-    ///     signal.events_between(Timestamp::new(40), Timestamp::new(45)),
+    ///     signal.events_between(
+    ///         Timestamp::new(40, Scale::Picosecond), Timestamp::new(45, Scale::Picosecond)
+    ///     ),
     ///     (SignalValue::new(0), 2, SignalValue::new(1338))
     /// )
     /// ```
@@ -192,28 +197,43 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 1);
-    /// signal.add_event(Timestamp::new(0), SignalValue::new(0));
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(1));
-    /// signal.add_event(Timestamp::new(43), SignalValue::new(0));
+    /// signal.add_event(Timestamp::new(0, Scale::Picosecond), SignalValue::new(0));
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(1));
+    /// signal.add_event(Timestamp::new(43, Scale::Picosecond), SignalValue::new(0));
     ///
-    /// assert_eq!(signal.get_next_rising_edge(Timestamp::new(40)).unwrap(), Timestamp::new(42));
-    /// assert_eq!(signal.get_next_rising_edge(Timestamp::new(43)).is_none(), true);
+    /// assert_eq!(
+    ///     signal.get_next_rising_edge(Timestamp::new(40, Scale::Picosecond)).unwrap(),
+    ///     Timestamp::new(42, Scale::Picosecond)
+    /// );
+    /// assert_eq!(signal.get_next_rising_edge(
+    ///     Timestamp::new(43, Scale::Picosecond)).is_none(),
+    ///     true
+    /// );
     ///
     /// assert_eq!(signal.get_previous_rising_edge(
-    ///     Timestamp::new(44)).unwrap(), Timestamp::new(42)
+    ///     Timestamp::new(44, Scale::Picosecond)).unwrap(), Timestamp::new(42, Scale::Picosecond)
     /// );
-    /// assert_eq!(signal.get_previous_rising_edge(Timestamp::new(40)).is_none(), true);
+    /// assert_eq!(
+    ///     signal.get_previous_rising_edge(Timestamp::new(40, Scale::Picosecond)).is_none(),
+    ///     true
+    /// );
     ///
-    /// assert_eq!(signal.get_next_falling_edge(Timestamp::new(40)).unwrap(), Timestamp::new(43));
-    /// assert_eq!(signal.get_next_falling_edge(Timestamp::new(44)).is_none(), true);
+    /// assert_eq!(
+    ///     signal.get_next_falling_edge(Timestamp::new(40, Scale::Picosecond)).unwrap(),
+    ///     Timestamp::new(43, Scale::Picosecond)
+    /// );
+    /// assert_eq!(
+    ///     signal.get_next_falling_edge(Timestamp::new(44, Scale::Picosecond)).is_none(),
+    ///     true
+    /// );
     ///
-    /// assert_eq!(signal.get_first_event().unwrap(), Timestamp::new(0));
-    /// assert_eq!(signal.get_last_event().unwrap(), Timestamp::new(43));
+    /// assert_eq!(signal.get_first_event().unwrap(), Timestamp::new(0, Scale::Picosecond));
+    /// assert_eq!(signal.get_last_event().unwrap(), Timestamp::new(43, Scale::Picosecond));
     /// ```
     pub fn get_next_rising_edge(&self, timestamp: Timestamp) -> Option<Timestamp> {
-        let start = self.index_of(Timestamp::new(timestamp.get_value() + 1));
+        let start = self.index_of(timestamp + timestamp.derive(1));
         let zero = SignalValue::new(0);
         for evt in &self.events[start..] {
             if evt.new_value != zero {
@@ -231,7 +251,7 @@ impl Signal {
     ///
     /// [`get_next_rising_edge`]: #method.get_next_rising_edge
     pub fn get_next_falling_edge(&self, timestamp: Timestamp) -> Option<Timestamp> {
-        let start = self.index_of(Timestamp::new(timestamp.get_value() + 1));
+        let start = self.index_of(timestamp + timestamp.derive(1));
         let zero = SignalValue::new(0);
         for evt in &self.events[start..] {
             if evt.new_value == zero {
@@ -249,7 +269,7 @@ impl Signal {
     ///
     /// [`get_next_rising_edge`]: #method.get_next_rising_edge
     pub fn get_previous_rising_edge(&self, timestamp: Timestamp) -> Option<Timestamp> {
-        let end = self.index_of(Timestamp::new(timestamp.get_value()));
+        let end = self.index_of(timestamp);
         let zero = SignalValue::new(0);
         for evt in self.events[0..end].iter().rev() {
             if evt.new_value != zero {
@@ -286,16 +306,16 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 32);
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(1337));
-    /// signal.add_event(Timestamp::new(43), SignalValue::new(1338));
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(1337));
+    /// signal.add_event(Timestamp::new(43, Scale::Picosecond), SignalValue::new(1338));
     ///
     /// let mut buf = Vec::new();
     /// signal.format_stats(&mut buf);
     /// assert_eq!(
     ///     String::from_utf8(buf).unwrap(),
-    ///     "0 (foo) - width: 32, edges: 2, from: 42, to: 43\n"
+    ///     "0 (foo) - width: 32, edges: 2, from: 42ps, to: 43ps\n"
     /// )
     /// ```
     pub fn format_stats(&self, output: &mut dyn io::Write) {
@@ -322,12 +342,12 @@ impl Signal {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalValue, Timestamp};
     /// let mut signal = Signal::new("0", "foo", 32);
-    /// signal.add_event(Timestamp::new(42), SignalValue::new(0x1337));
+    /// signal.add_event(Timestamp::new(42, Scale::Picosecond), SignalValue::new(0x1337));
     ///
     /// let mut buf = Vec::new();
-    /// signal.format_value_at(&mut buf, Timestamp::new(43));
+    /// signal.format_value_at(&mut buf, Timestamp::new(43, Scale::Picosecond));
     /// assert_eq!(
     ///     String::from_utf8(buf).unwrap(),
     ///     "0 (foo) = h00001337\n"
@@ -352,7 +372,8 @@ impl Signal {
     /// assert_eq!(signal.get_fullname(), "foo[:32]")
     /// ```
     pub fn get_fullname(&self) -> String {
-        format!("{}{}{}",
+        format!(
+            "{}{}{}",
             if !self.path.is_empty() {
                 format!("{}.", self.path[1..].join("."))
             } else {
@@ -363,7 +384,8 @@ impl Signal {
                 format!("[:{}]", self.width)
             } else {
                 String::new()
-            })
+            }
+        )
     }
 }
 
@@ -376,54 +398,74 @@ impl fmt::Display for Signal {
 #[cfg(test)]
 mod test {
     use super::*;
+    use signaldb::time::Scale;
 
     #[test]
     fn add_events() {
         let mut s = Signal::new("t", "test", 32);
-        s.add_event(Timestamp::new(42), SignalValue::new(0));
-        s.add_event(Timestamp::new(43), SignalValue::new(1));
-        assert_eq!(s.events[0].timestamp, Timestamp::new(42));
-        assert_eq!(s.events[1].timestamp, Timestamp::new(43));
+        s.add_event(Timestamp::new(42, Scale::Second), SignalValue::new(0));
+        s.add_event(Timestamp::new(43, Scale::Second), SignalValue::new(1));
+        assert_eq!(s.events[0].timestamp, Timestamp::new(42, Scale::Second));
+        assert_eq!(s.events[1].timestamp, Timestamp::new(43, Scale::Second));
 
-        s.add_event(Timestamp::new(44), SignalValue::new(1));
+        s.add_event(Timestamp::new(44, Scale::Second), SignalValue::new(1));
         assert_eq!(s.events.len(), 2);
 
-        s.add_event(Timestamp::new(43), SignalValue::new(0));
+        s.add_event(Timestamp::new(43, Scale::Second), SignalValue::new(0));
         assert_eq!(s.events.len(), 1);
     }
 
     #[test]
     fn values() {
         let mut s = Signal::new("t", "test", 32);
-        s.add_event(Timestamp::new(42), SignalValue::new(0));
-        s.add_event(Timestamp::new(43), SignalValue::new(1));
-        s.add_event(Timestamp::new(45), SignalValue::new(0));
+        s.add_event(Timestamp::new(42, Scale::Second), SignalValue::new(0));
+        s.add_event(Timestamp::new(43, Scale::Second), SignalValue::new(1));
+        s.add_event(Timestamp::new(45, Scale::Second), SignalValue::new(0));
 
         assert_eq!(
-            s.value_at(Timestamp::new(41)),
+            s.value_at(Timestamp::new(41, Scale::Second)),
             SignalValue::new_default(32, BitValue::Undefined)
         );
-        assert_eq!(s.value_at(Timestamp::new(42)), SignalValue::new(0));
-        assert_eq!(s.value_at(Timestamp::new(43)), SignalValue::new(1));
-        assert_eq!(s.value_at(Timestamp::new(44)), SignalValue::new(1));
-        assert_eq!(s.value_at(Timestamp::new(45)), SignalValue::new(0));
-        assert_eq!(s.value_at(Timestamp::new(100)), SignalValue::new(0));
+        assert_eq!(
+            s.value_at(Timestamp::new(42, Scale::Second)),
+            SignalValue::new(0)
+        );
+        assert_eq!(
+            s.value_at(Timestamp::new(43, Scale::Second)),
+            SignalValue::new(1)
+        );
+        assert_eq!(
+            s.value_at(Timestamp::new(44, Scale::Second)),
+            SignalValue::new(1)
+        );
+        assert_eq!(
+            s.value_at(Timestamp::new(45, Scale::Second)),
+            SignalValue::new(0)
+        );
+        assert_eq!(
+            s.value_at(Timestamp::new(100, Scale::Second)),
+            SignalValue::new(0)
+        );
     }
 
     #[test]
     fn slices() {
         let mut s = Signal::new("t", "test", 32);
-        s.add_event(Timestamp::new(42), SignalValue::new(0));
-        s.add_event(Timestamp::new(43), SignalValue::new(1));
-        s.add_event(Timestamp::new(45), SignalValue::new(0));
+        s.add_event(Timestamp::new(42, Scale::Second), SignalValue::new(0));
+        s.add_event(Timestamp::new(43, Scale::Second), SignalValue::new(1));
+        s.add_event(Timestamp::new(45, Scale::Second), SignalValue::new(0));
 
-        let (_, big_slice, _) = s.events_between(Timestamp::new(0), Timestamp::new(100));
+        let (_, big_slice, _) =
+            s.events_between(Timestamp::origin(), Timestamp::new(100, Scale::Second));
         assert_eq!(big_slice, 3);
-        let (_, medium_slice, _) = s.events_between(Timestamp::new(0), Timestamp::new(44));
+        let (_, medium_slice, _) =
+            s.events_between(Timestamp::origin(), Timestamp::new(44, Scale::Second));
         assert_eq!(medium_slice, 2);
-        let (_, small_slice, _) = s.events_between(Timestamp::new(0), Timestamp::new(43));
+        let (_, small_slice, _) =
+            s.events_between(Timestamp::origin(), Timestamp::new(43, Scale::Second));
         assert_eq!(small_slice, 1);
-        let (_, empty_slice, _) = s.events_between(Timestamp::new(0), Timestamp::new(10));
+        let (_, empty_slice, _) =
+            s.events_between(Timestamp::origin(), Timestamp::new(10, Scale::Second));
         assert_eq!(empty_slice, 0);
     }
 }

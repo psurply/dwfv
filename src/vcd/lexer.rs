@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-use crate::signaldb::{SignalValue, Timestamp};
+use crate::signaldb::{Scale, SignalValue, Timestamp};
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io::prelude::*;
@@ -29,7 +29,8 @@ pub enum Token {
     Integer(usize),
     Value(SignalValue),
     ValueIdentifier(SignalValue, String),
-    Timestamp(Timestamp),
+    Timestamp(i64),
+    Timescale(Timestamp),
     Eof,
 }
 
@@ -41,6 +42,7 @@ pub enum Context {
     IdRange,
     ShortId,
     Value,
+    Timescale,
 }
 
 pub struct Lexer<I: BufRead> {
@@ -89,7 +91,7 @@ impl Token {
     fn retokenize_timestamp(word: &str) -> Option<Token> {
         match word.chars().next().unwrap() {
             '#' => match word[1..].parse() {
-                Ok(i) => Some(Token::Timestamp(Timestamp::new(i))),
+                Ok(i) => Some(Token::Timestamp(i)),
                 Err(_) => None,
             },
             _ => None,
@@ -118,6 +120,19 @@ impl Token {
         Some(Token::Identifier(word.to_string()))
     }
 
+    fn retokenize_timescale(word: &str) -> Option<Token> {
+        lazy_static! {
+            static ref RE: Regex = Regex::new("^([[:digit:]]*)([munpf]?s)$").unwrap();
+        }
+
+        RE.captures(word).map(|cap| {
+            Token::Timescale(Timestamp::new(
+                cap[1].parse().unwrap_or(1),
+                Scale::from_str(&cap[2]).unwrap(),
+            ))
+        })
+    }
+
     fn retokenize(self, ctx: Context) -> Token {
         match self {
             Token::Word(word) => match ctx {
@@ -137,6 +152,10 @@ impl Token {
                     .unwrap_or(Token::Identifier(word)),
                 Context::Value => Token::retokenize_kw(&word)
                     .or_else(|| Token::retokenize_value(&word))
+                    .unwrap_or(Token::Word(word)),
+                Context::Timescale => Token::retokenize_kw(&word)
+                    .or_else(|| Token::retokenize_integer(&word))
+                    .or_else(|| Token::retokenize_timescale(&word))
                     .unwrap_or(Token::Word(word)),
             },
             tok => tok,

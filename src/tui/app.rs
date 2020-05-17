@@ -6,7 +6,7 @@ use super::instr::TuiInstr;
 use super::searchbar::SearchBar;
 use super::statusbar::StatusBar;
 use super::waveform::{Waveform, WaveformElement};
-use crate::signaldb::{AsyncSignalDB, SignalValue, Timestamp};
+use crate::signaldb::{AsyncSignalDB, Scale, SignalValue, Timestamp};
 use std::cmp::{self, Ordering};
 use std::env;
 use std::error::Error;
@@ -20,7 +20,8 @@ use tuirs::backend::Backend;
 use tuirs::layout::Rect;
 use tuirs::terminal::Frame;
 
-const MAX_ZOOM: i64 = 1 << 48;
+const MAX_ID_SIZE: usize = 28;
+const MAX_SCALE_VALUE: i64 = 1 << 16;
 const HELP_MSG: &str = "q:Quit  h,j,k,l:Move  +,-,=:Zoom  v:Select  /,f:Search  o:Edit  \
     yy:Peek  p,P:Pop  dd:Stash  u,r:Undo/Redo";
 
@@ -58,20 +59,21 @@ impl App {
             .iter()
             .map(|i| TuiInstr::Signal(i.to_string()))
             .collect();
+        let timescale = signaldb.sync_db.get_timescale();
         let mut app = App {
             signaldb,
-            scale: Timestamp::new(1),
+            scale: timescale,
             height: 0,
             visual_cursor: Position {
-                x: Timestamp::new(0),
+                x: Timestamp::origin(),
                 y: 0,
             },
             cursor: Position {
-                x: Timestamp::new(0),
+                x: Timestamp::origin(),
                 y: 0,
             },
             window: Position {
-                x: Timestamp::new(0),
+                x: Timestamp::origin(),
                 y: 0,
             },
             events: Events::new(),
@@ -117,7 +119,7 @@ impl App {
     }
 
     fn get_relative_cursor_x(&self) -> usize {
-        ((self.cursor.x - self.window.x).get_value() / self.scale.get_value()) as usize
+        (self.cursor.x - self.window.x) / self.scale
     }
 
     fn get_relative_visual_cursor_x(&self) -> Option<usize> {
@@ -125,8 +127,7 @@ impl App {
             let cursor = if self.visual_cursor.x < self.window.x {
                 0
             } else {
-                ((self.visual_cursor.x - self.window.x).get_value() / self.scale.get_value())
-                    as usize
+                (self.visual_cursor.x - self.window.x) / self.scale
             };
             Some(cursor)
         } else {
@@ -135,7 +136,7 @@ impl App {
     }
 
     fn get_time_range(&self, offset: u16) -> (Timestamp, Timestamp) {
-        let begin = self.window.x + Timestamp::new(self.scale.get_value() * offset as i64);
+        let begin = self.window.x + self.scale * offset as i64;
         let end = begin + self.scale;
         (begin, end)
     }
@@ -288,7 +289,7 @@ impl App {
             self.window.x = self.cursor.x
         }
 
-        let period = Timestamp::new(self.scale.get_value() * (self.area.width - 1) as i64);
+        let period = self.scale * (self.area.width - 1) as i64;
         if self.window.x + period < self.cursor.x {
             self.window.x = self.cursor.x - period
         }
@@ -308,8 +309,16 @@ impl App {
         }
     }
 
+    fn adjust_scale(&mut self) {
+        let max_scale = Timestamp::new(10, Scale::Second);
+        self.scale.auto_rescale(MAX_SCALE_VALUE);
+        if self.scale > max_scale {
+            self.scale = max_scale
+        }
+    }
+
     fn center_window(&mut self) {
-        let period = Timestamp::new(self.scale.get_value() * (self.area.width / 2) as i64);
+        let period = self.scale * (self.area.width / 2) as i64;
         self.window.x = self.cursor.x - period
     }
 
@@ -344,7 +353,7 @@ impl App {
     }
 
     fn set_cursor_horizontal(&mut self, x: u16) {
-        let offset = Timestamp::new((x - 1) as i64 * self.scale.get_value());
+        let offset = self.scale * (x as i64 - 1);
         self.cursor.x = self.window.x + offset;
     }
 
@@ -588,16 +597,14 @@ impl App {
     }
 
     fn fit_to_selection(&mut self) {
-        let visual_cursor = self.visual_cursor.x.get_value();
-        let cursor = self.cursor.x.get_value();
-        let begin = cmp::min(visual_cursor, cursor);
-        let end = cmp::max(visual_cursor, cursor);
-
-        let scale = (end - begin) / self.area.width as i64;
-        if scale >= 1 {
-            self.scale = Timestamp::new(scale);
-            self.window.x = Timestamp::new(begin);
-            self.cursor.x = Timestamp::new(begin + ((end - begin) / 2))
+        let begin = cmp::min(self.visual_cursor.x, self.cursor.x);
+        let end = cmp::max(self.visual_cursor.x, self.cursor.x);
+        let period = end - begin;
+        if period != Timestamp::origin() {
+            self.scale = period / self.area.width as i64;
+            self.adjust_scale();
+            self.window.x = begin;
+            self.cursor.x = begin + (period / 2)
         }
     }
 
@@ -622,20 +629,16 @@ impl App {
 
         match period {
             Some((Some(first_event), Some(last_event))) => {
-                let begin = first_event.get_value();
-                let end = last_event.get_value();
-
-                let scale = (end - begin) / self.area.width as i64;
-                if scale >= 1 {
-                    self.scale = Timestamp::new(scale);
-                    self.window.x = Timestamp::new(begin);
+                let period = last_event - first_event;
+                if period != Timestamp::origin() {
+                    self.scale = period / self.area.width as i64;
+                    self.adjust_scale();
+                    self.window.x = first_event;
                     if self.cursor.x < first_event {
                         self.cursor.x = first_event;
                     } else if last_event < self.cursor.x {
                         self.cursor.x = last_event;
                     }
-                } else {
-                    self.set_status("Cannot zoom more")
                 }
             }
             _ => self.set_status(&format!("Cannot zoom fit {}", &self.layout[self.cursor.y])),
@@ -801,21 +804,12 @@ impl App {
                 }
                 Event::PageDown => self.cursor.y += self.get_current_instr_height(),
                 Event::ZoomOut => {
-                    let mut scale = self.scale.get_value() * 2;
-                    if scale > MAX_ZOOM {
-                        scale = MAX_ZOOM;
-                        self.set_status("Cannot zoom out more")
-                    }
-                    self.scale = Timestamp::new(scale);
+                    self.scale *= 2;
+                    self.adjust_scale();
                     self.center_window()
                 }
                 Event::ZoomIn => {
-                    let mut scale = self.scale.get_value() / 2;
-                    if scale < 1 {
-                        scale = 1;
-                        self.set_status("Cannot zoom in more")
-                    };
-                    self.scale = Timestamp::new(scale);
+                    self.scale /= 2;
                     self.center_window()
                 }
                 Event::ZoomFit => self.zoom_fit(),
@@ -830,7 +824,7 @@ impl App {
                 Event::GotoPreviousRisingEdge => self.goto_previous_rising_edge(),
                 Event::GotoFirstEvent => self.goto_first_event(),
                 Event::GotoLastEvent => self.goto_last_event(),
-                Event::GotoZero => self.cursor.x = Timestamp::new(0),
+                Event::GotoZero => self.cursor.x = Timestamp::origin(),
                 Event::StartVisualMode => self.visual_cursor = self.cursor.clone(),
                 Event::FitToSelection => self.fit_to_selection(),
                 Event::Edit => self.edit(),

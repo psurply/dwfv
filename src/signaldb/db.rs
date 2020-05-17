@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 use super::scope::{Scope, ScopeChild};
 use super::signal::Signal;
-use super::time::Timestamp;
+use super::time::{Scale, Timestamp};
 use super::value::SignalValue;
 use crate::search::{FindingsSummary, Search};
 use crate::vcd::parser::Parser;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -22,12 +22,13 @@ use std::sync::{Condvar, Mutex};
 pub struct SignalDB {
     scope: Mutex<Scope>,
     signals: Mutex<BTreeMap<String, Signal>>,
-    timestamps: Mutex<Vec<Timestamp>>,
+    timestamps: Mutex<BTreeSet<Timestamp>>,
     now: Mutex<Timestamp>,
     searches: Mutex<HashMap<String, Search>>,
     status: Mutex<String>,
     initialized: (Mutex<bool>, Condvar),
     valid: Mutex<bool>,
+    timescale: Mutex<Timestamp>,
 }
 
 #[derive(Debug)]
@@ -105,28 +106,6 @@ impl fmt::Display for InitializationError {
     }
 }
 
-pub struct EventIterator<'a> {
-    signaldb: &'a SignalDB,
-    index: usize,
-}
-
-impl<'a> EventIterator<'a> {
-    pub fn new(signaldb: &'a SignalDB) -> EventIterator<'a> {
-        EventIterator { signaldb, index: 0 }
-    }
-}
-
-impl<'a> Iterator for EventIterator<'a> {
-    type Item = Timestamp;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let timestamps = self.signaldb.timestamps.lock().unwrap();
-        let timestamp = timestamps.get(self.index).copied();
-        self.index += 1;
-        timestamp
-    }
-}
-
 impl Default for SignalDB {
     fn default() -> Self {
         Self::new()
@@ -144,15 +123,18 @@ impl SignalDB {
     /// let mut db = dwfv::signaldb::SignalDB::new();
     /// ```
     pub fn new() -> SignalDB {
+        let mut timestamps = BTreeSet::new();
+        timestamps.insert(Timestamp::origin());
         SignalDB {
             scope: Mutex::new(Scope::new(String::from("top"))),
             signals: Mutex::new(BTreeMap::new()),
-            timestamps: Mutex::new(vec![Timestamp::new(0)]),
-            now: Mutex::new(Timestamp::new(0)),
+            timestamps: Mutex::new(timestamps),
+            now: Mutex::new(Timestamp::origin()),
             searches: Mutex::new(HashMap::new()),
             status: Mutex::new(String::from("Test")),
             initialized: (Mutex::new(false), Condvar::new()),
             valid: Mutex::new(true),
+            timescale: Mutex::new(Timestamp::new(1, Scale::Picosecond)),
         }
     }
 
@@ -161,7 +143,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, SignalValue, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 32 0 foo $end
     /// $var string 1 1 state $end
@@ -180,11 +162,11 @@ impl SignalDB {
     ///
     /// let db = SignalDB::from_vcd(buf).unwrap();
     ///
-    /// let timestamp = Timestamp::new(1336);
+    /// let timestamp = Timestamp::new(1336, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(0));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("INIT"));
     ///
-    /// let timestamp = Timestamp::new(1338);
+    /// let timestamp = Timestamp::new(1338, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(42));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("TEST"));
     /// ```
@@ -198,7 +180,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, SignalValue, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 32 0 foo $end
     /// $var string 1 1 state $end
@@ -215,19 +197,19 @@ impl SignalDB {
     /// sTEST 1
     /// ");
     ///
-    /// let db = SignalDB::from_vcd_with_limit(buf, Some(Timestamp::new(1300))).unwrap();
+    /// let db = SignalDB::from_vcd_with_limit(buf, Some(1300)).unwrap();
     ///
-    /// let timestamp = Timestamp::new(1000);
+    /// let timestamp = Timestamp::new(1000, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(0));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("INIT"));
     ///
-    /// let timestamp = Timestamp::new(1338);
+    /// let timestamp = Timestamp::new(1338, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(0));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("INIT"));
     /// ```
     pub fn from_vcd_with_limit<I: io::BufRead>(
         input: I,
-        timestamp: Option<Timestamp>,
+        timestamp: Option<i64>,
     ) -> Result<SignalDB, Box<dyn Error>> {
         let db = SignalDB::new();
         db.parse_vcd_with_limit(input, timestamp)?;
@@ -239,7 +221,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, SignalValue, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 32 0 foo $end
     /// $var string 1 1 state $end
@@ -259,11 +241,11 @@ impl SignalDB {
     /// let mut db = SignalDB::new();
     /// db.parse_vcd(buf).unwrap();
     ///
-    /// let timestamp = Timestamp::new(1336);
+    /// let timestamp = Timestamp::new(1336, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(0));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("INIT"));
     ///
-    /// let timestamp = Timestamp::new(1338);
+    /// let timestamp = Timestamp::new(1338, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(42));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("TEST"));
     /// ```
@@ -277,7 +259,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, SignalValue, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 32 0 foo $end
     /// $var string 1 1 state $end
@@ -295,20 +277,20 @@ impl SignalDB {
     /// ");
     ///
     /// let mut db = SignalDB::new();
-    /// db.parse_vcd_with_limit(buf, Some(Timestamp::new(1300))).unwrap();
+    /// db.parse_vcd_with_limit(buf, Some(1300)).unwrap();
     ///
-    /// let timestamp = Timestamp::new(1000);
+    /// let timestamp = Timestamp::new(1000, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(0));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("INIT"));
     ///
-    /// let timestamp = Timestamp::new(1338);
+    /// let timestamp = Timestamp::new(1338, Scale::Picosecond);
     /// assert_eq!(db.value_at("0", timestamp).unwrap(), SignalValue::new(0));
     /// assert_eq!(db.value_at("1", timestamp).unwrap(), SignalValue::from_symbol_str("INIT"));
     /// ```
     pub fn parse_vcd_with_limit<I: io::BufRead>(
         &self,
         input: I,
-        timestamp: Option<Timestamp>,
+        timestamp: Option<i64>,
     ) -> Result<(), Box<dyn Error>> {
         let mut parser = Parser::new(input, self);
         if let Some(t) = timestamp {
@@ -424,6 +406,18 @@ impl SignalDB {
         status.clone()
     }
 
+    /// Set default time scale of the `SignalDB`
+    pub fn set_timescale(&self, scale: Timestamp) {
+        let mut timescale = self.timescale.lock().unwrap();
+        *timescale = scale
+    }
+
+    /// Get default time scale of the `SignalDB`
+    pub fn get_timescale(&self) -> Timestamp {
+        let timescale = self.timescale.lock().unwrap();
+        *timescale
+    }
+
     /// Create a scope in the `SignalDB`.
     ///
     /// # Example
@@ -472,7 +466,7 @@ impl SignalDB {
     /// # Examples
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, Timestamp};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -481,7 +475,7 @@ impl SignalDB {
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
     ///
-    /// db.insert_event("0", Timestamp::new(42), SignalValue::new(0));
+    /// db.insert_event("0", Timestamp::new(42, Scale::Picosecond), SignalValue::new(0));
     /// ```
     pub fn insert_event(
         &self,
@@ -503,14 +497,14 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, Timestamp};
     /// let mut db = SignalDB::new();
-    /// db.set_time(Timestamp::new(42));
+    /// db.set_time(Timestamp::new(42, Scale::Picosecond));
     /// ```
     pub fn set_time(&self, timestamp: Timestamp) {
         let mut now = self.now.lock().unwrap();
         let mut timestamps = self.timestamps.lock().unwrap();
-        timestamps.push(timestamp);
+        timestamps.insert(timestamp);
         *now = timestamp;
     }
 
@@ -519,16 +513,16 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, Timestamp};
     /// let mut db = SignalDB::new();
-    /// db.set_time(Timestamp::new(42));
+    /// db.set_time(Timestamp::new(42, Scale::Picosecond));
     /// let scope = &vec!["foo", "bar"];
     /// db.create_scope(&scope);
     ///
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
     ///
-    /// db.set_time(Timestamp::new(42));
+    /// db.set_time(Timestamp::new(42, Scale::Picosecond));
     /// db.set_current_value("0", SignalValue::new(0));
     /// ```
     pub fn set_current_value(
@@ -548,7 +542,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, Timestamp};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -556,18 +550,20 @@ impl SignalDB {
     ///
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
-    /// db.insert_event("0", Timestamp::new(42), SignalValue::new(0x1337));
-    /// db.insert_event("0", Timestamp::new(43), SignalValue::new(0x1338));
-    /// db.insert_event("0", Timestamp::new(44), SignalValue::new(0x1339));
+    /// db.insert_event("0", Timestamp::new(42, Scale::Picosecond), SignalValue::new(0x1337));
+    /// db.insert_event("0", Timestamp::new(43, Scale::Picosecond), SignalValue::new(0x1338));
+    /// db.insert_event("0", Timestamp::new(44, Scale::Picosecond), SignalValue::new(0x1339));
     ///
     /// let mut events = db.get_timestamps();
-    /// assert_eq!(events.next().unwrap(), Timestamp::new(0));
-    /// assert_eq!(events.next().unwrap(), Timestamp::new(42));
-    /// assert_eq!(events.next().unwrap(), Timestamp::new(43));
-    /// assert_eq!(events.next().unwrap(), Timestamp::new(44));
+    /// let values = vec![0, 42, 43, 44];
+    ///
+    /// for (i, event) in events.iter().enumerate() {
+    ///     assert_eq!(*event, Timestamp::new(values[i], Scale::Picosecond));
+    /// }
     /// ```
-    pub fn get_timestamps(&self) -> EventIterator {
-        EventIterator::new(self)
+    pub fn get_timestamps(&self) -> Vec<Timestamp> {
+        let timestamps = self.timestamps.lock().unwrap();
+        timestamps.iter().cloned().collect()
     }
 
     /// Return value of a signal at a given time.
@@ -575,7 +571,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, BitValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, BitValue, Timestamp};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -583,14 +579,20 @@ impl SignalDB {
     ///
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
-    /// db.insert_event("0", Timestamp::new(42), SignalValue::new(0x1337));
+    /// db.insert_event("0", Timestamp::new(42, Scale::Picosecond), SignalValue::new(0x1337));
     ///
     /// assert_eq!(
-    ///     db.value_at("0", Timestamp::new(41)).unwrap(),
+    ///     db.value_at("0", Timestamp::new(41, Scale::Picosecond)).unwrap(),
     ///     SignalValue::new_default(32, BitValue::Undefined)
     /// );
-    /// assert_eq!(db.value_at("0", Timestamp::new(42)).unwrap(), SignalValue::new(0x1337));
-    /// assert_eq!(db.value_at("0", Timestamp::new(43)).unwrap(), SignalValue::new(0x1337));
+    /// assert_eq!(
+    ///     db.value_at("0", Timestamp::new(42, Scale::Picosecond)).unwrap(),
+    ///     SignalValue::new(0x1337)
+    /// );
+    /// assert_eq!(
+    ///     db.value_at("0", Timestamp::new(43, Scale::Picosecond)).unwrap(),
+    ///     SignalValue::new(0x1337)
+    /// );
     /// ```
     pub fn value_at(
         &self,
@@ -609,7 +611,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, BitValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, BitValue, Timestamp};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -617,14 +619,20 @@ impl SignalDB {
     ///
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
-    /// db.insert_event("0", Timestamp::new(42), SignalValue::new(0x1337));
+    /// db.insert_event("0", Timestamp::new(42, Scale::Picosecond), SignalValue::new(0x1337));
     ///
-    /// assert_eq!(db.event_at("0", Timestamp::new(41)).unwrap().is_none(), true);
     /// assert_eq!(
-    ///     db.event_at("0", Timestamp::new(42)).unwrap().unwrap(),
+    ///     db.event_at("0", Timestamp::new(41, Scale::Picosecond)).unwrap().is_none(),
+    ///     true
+    /// );
+    /// assert_eq!(
+    ///     db.event_at("0", Timestamp::new(42, Scale::Picosecond)).unwrap().unwrap(),
     ///     SignalValue::new(0x1337)
     /// );
-    /// assert_eq!(db.event_at("0", Timestamp::new(43)).unwrap().is_none(), true);
+    /// assert_eq!(
+    ///     db.event_at("0", Timestamp::new(43, Scale::Picosecond)).unwrap().is_none(),
+    ///     true
+    /// );
     /// ```
     pub fn event_at(
         &self,
@@ -643,7 +651,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, BitValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, BitValue, Timestamp};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -667,7 +675,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -689,7 +697,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -720,7 +728,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -740,7 +748,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 1 0 foo $end
     /// $upscope $end
@@ -757,19 +765,22 @@ impl SignalDB {
     ///
     /// let db = SignalDB::from_vcd(buf).unwrap();
     /// assert_eq!(
-    ///     db.get_next_rising_edge("0", Timestamp::new(0)).unwrap().unwrap(),
-    ///     Timestamp::new(1337)
+    ///     db.get_next_rising_edge("0", Timestamp::new(0, Scale::Picosecond)).unwrap().unwrap(),
+    ///     Timestamp::new(1337, Scale::Picosecond)
     /// );
     /// assert_eq!(
-    ///     db.get_next_rising_edge("0", Timestamp::new(1338)).unwrap().is_none(),
+    ///     db.get_next_rising_edge( "0", Timestamp::new(1338, Scale::Picosecond))
+    ///         .unwrap().is_none(),
     ///     true
     /// );
     /// assert_eq!(
-    ///     db.get_previous_rising_edge("0", Timestamp::new(1338)).unwrap().unwrap(),
-    ///     Timestamp::new(1337)
+    ///     db.get_previous_rising_edge("0", Timestamp::new(1338, Scale::Picosecond))
+    ///         .unwrap().unwrap(),
+    ///     Timestamp::new(1337, Scale::Picosecond)
     /// );
     /// assert_eq!(
-    ///     db.get_previous_rising_edge("0", Timestamp::new(2)).unwrap().is_none(),
+    ///     db.get_previous_rising_edge("0", Timestamp::new(2, Scale::Picosecond))
+    ///         .unwrap().is_none(),
     ///     true
     /// );
     /// ```
@@ -809,7 +820,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 1 0 foo $end
     /// $upscope $end
@@ -826,8 +837,8 @@ impl SignalDB {
     ///
     /// let db = SignalDB::from_vcd(buf).unwrap();
     /// assert_eq!(
-    ///     db.get_next_falling_edge("0", Timestamp::new(0)).unwrap().unwrap(),
-    ///     Timestamp::new(1338)
+    ///     db.get_next_falling_edge("0", Timestamp::new(0, Scale::Picosecond)).unwrap().unwrap(),
+    ///     Timestamp::new(1338, Scale::Picosecond)
     /// );
     /// ```
     pub fn get_next_falling_edge(
@@ -847,7 +858,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 1 0 foo $end
     /// $upscope $end
@@ -863,8 +874,14 @@ impl SignalDB {
     /// ");
     ///
     /// let db = SignalDB::from_vcd(buf).unwrap();
-    /// assert_eq!(db.get_first_event("0").unwrap().unwrap(), Timestamp::new(0));
-    /// assert_eq!(db.get_last_event("0").unwrap().unwrap(), Timestamp::new(1338));
+    /// assert_eq!(
+    ///     db.get_first_event("0").unwrap().unwrap(),
+    ///     Timestamp::new(0, Scale::Picosecond)
+    /// );
+    /// assert_eq!(
+    ///     db.get_last_event("0").unwrap().unwrap(),
+    ///     Timestamp::new(1338, Scale::Picosecond)
+    /// );
     /// ```
     pub fn get_first_event(&self, signal_id: &str) -> Result<Option<Timestamp>, SignalNotFound> {
         let signals = self.signals.lock().unwrap();
@@ -894,7 +911,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, SignalDB, SignalValue, Timestamp};
     /// let buf = std::io::Cursor::new("$scope module top $end
     /// $var wire 1 0 foo $end
     /// $upscope $end
@@ -913,11 +930,14 @@ impl SignalDB {
     ///
     /// let db = SignalDB::from_vcd(buf).unwrap();
     /// assert_eq!(
-    ///     db.events_between("0", Timestamp::new(1), Timestamp::new(1340)).unwrap(),
+    ///     db.events_between(
+    ///         "0", Timestamp::new(1, Scale::Picosecond),
+    ///         Timestamp::new(1340, Scale::Picosecond)).unwrap(),
     ///     (SignalValue::new(0), 2, SignalValue::new(0))
     /// );
     /// assert_eq!(
-    ///     db.events_between("0", Timestamp::new(1), Timestamp::new(1339)).unwrap(),
+    ///     db.events_between("0", Timestamp::new(1, Scale::Picosecond),
+    ///         Timestamp::new(1339, Scale::Picosecond)).unwrap(),
     ///     (SignalValue::new(0), 1, SignalValue::new(1))
     /// );
     /// ```
@@ -968,14 +988,14 @@ impl SignalDB {
     /// db.search_all(&mut buf, "$0 = 1").expect("Invalid search expression");
     /// assert_eq!(
     ///     String::from_utf8(buf).unwrap(),
-    ///     "1337-1338\n"
+    ///     "1337ps-1338ps\n"
     /// );
     ///
     /// let mut buf = Vec::new();
     /// db.search_all(&mut buf, "$0 <- 1").expect("Invalid search expression");
     /// assert_eq!(
     ///     String::from_utf8(buf).unwrap(),
-    ///     "1337\n"
+    ///     "1337ps\n"
     /// );
     /// ```
     pub fn search_all<'a>(
@@ -995,7 +1015,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{FindingsSummary, SignalDB, Timestamp};
+    /// use dwfv::signaldb::{Scale, FindingsSummary, SignalDB, Timestamp};
     /// let vcd = std::io::Cursor::new("
     /// $scope module logic $end
     /// $var wire 1 # foo $end
@@ -1022,22 +1042,31 @@ impl SignalDB {
     /// // Synchronous search
     /// db.search(expr);
     ///
-    /// assert_eq!(db.get_first_finding(expr).unwrap().unwrap(), Timestamp::new(42));
-    /// assert_eq!(db.get_last_finding(expr).unwrap().unwrap(), Timestamp::new(1338));
     /// assert_eq!(
-    ///     db.get_next_finding(expr, Timestamp::new(43)).unwrap().unwrap(),
-    ///     Timestamp::new(1337)
+    ///     db.get_first_finding(expr).unwrap().unwrap(),
+    ///     Timestamp::new(42, Scale::Picosecond)
     /// );
     /// assert_eq!(
-    ///     db.get_end_of_next_finding(expr, Timestamp::new(43)).unwrap().unwrap(),
-    ///     Timestamp::new(1338)
+    ///     db.get_last_finding(expr).unwrap().unwrap(),
+    ///     Timestamp::new(1338, Scale::Picosecond)
     /// );
     /// assert_eq!(
-    ///     db.get_previous_finding(expr, Timestamp::new(43)).unwrap().unwrap(),
-    ///     Timestamp::new(42)
+    ///     db.get_next_finding(expr, Timestamp::new(43, Scale::Picosecond)).unwrap().unwrap(),
+    ///     Timestamp::new(1337, Scale::Picosecond)
     /// );
     /// assert_eq!(
-    ///     db.findings_between(expr, Timestamp::new(0), Timestamp::new(1339)).unwrap(),
+    ///     db.get_end_of_next_finding(expr, Timestamp::new(43, Scale::Picosecond))
+    ///         .unwrap().unwrap(),
+    ///     Timestamp::new(1338, Scale::Picosecond)
+    /// );
+    /// assert_eq!(
+    ///     db.get_previous_finding(expr, Timestamp::new(43, Scale::Picosecond)).unwrap().unwrap(),
+    ///     Timestamp::new(42, Scale::Picosecond)
+    /// );
+    /// assert_eq!(
+    ///     db.findings_between(
+    ///         expr, Timestamp::new(0, Scale::Picosecond),
+    ///         Timestamp::new(1339, Scale::Picosecond)).unwrap(),
     ///     FindingsSummary::Complex(2)
     /// );
     /// ```
@@ -1232,7 +1261,7 @@ impl SignalDB {
     /// # Example
     ///
     /// ```
-    /// use dwfv::signaldb::{Signal, SignalDB, SignalValue, Timestamp};
+    /// use dwfv::signaldb::{Scale, Signal, SignalDB, SignalValue, Timestamp};
     /// let mut db = SignalDB::new();
     ///
     /// let scope = &vec!["foo", "bar"];
@@ -1240,18 +1269,20 @@ impl SignalDB {
     ///
     /// let signal = Signal::new("0", "baz", 32);
     /// db.declare_signal(&scope, signal);
-    /// db.insert_event("0", Timestamp::new(42), SignalValue::new(0x1337));
+    /// db.insert_event("0", Timestamp::new(42, Scale::Picosecond), SignalValue::new(0x1337));
     ///
     /// let mut buf = Vec::new();
-    /// db.format_values_at(&mut buf, Timestamp::new(43));
+    /// db.format_values_at(&mut buf, 43);
     /// assert_eq!(
     ///     String::from_utf8(buf).unwrap(),
     ///     "foo\n  bar\n    0 (baz) = h00001337\n"
     /// )
     /// ```
-    pub fn format_values_at(&self, output: &mut dyn io::Write, timestamp: Timestamp) {
+    pub fn format_values_at(&self, output: &mut dyn io::Write, timestamp: i64) {
         let scope = self.scope.lock().unwrap();
         let signals = self.signals.lock().unwrap();
+        let timescale = self.timescale.lock().unwrap();
+        let timestamp = Timestamp::new(timestamp, timescale.scale);
         scope.traverse(&mut |name, node: &ScopeChild, depth| {
             for _ in 0..depth {
                 let _ = write!(output, "  ");
