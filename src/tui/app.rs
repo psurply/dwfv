@@ -147,6 +147,7 @@ impl App {
         rect: Rect,
         signal_id: &str,
         selected: bool,
+        odd: bool,
     ) -> Result<(), Box<dyn Error>> {
         let mut data = Vec::new();
         for i in 0..rect.width {
@@ -190,15 +191,20 @@ impl App {
         let waveform = Waveform::new(
             format!(
                 "{}{}: {} = {}",
-                if selected { "> " } else { "" },
+                if selected { "> " } else { "  " },
                 signal_id,
-                fullname,
+                if fullname.len() > MAX_ID_SIZE {
+                    format!("...{}", &fullname[fullname.len() - MAX_ID_SIZE..])
+                } else {
+                    fullname
+                },
                 value
             ),
             &data[..],
             selected,
             self.get_relative_cursor_x(),
             self.get_relative_visual_cursor_x(),
+            odd,
         );
         f.render_widget(waveform, rect);
         Ok(())
@@ -217,7 +223,7 @@ impl App {
             data.push(self.signaldb.sync_db.findings_between(expr, begin, end)?)
         }
         let search_bar = SearchBar::new(
-            format!("{}{}", if selected { "-> " } else { "" }, expr),
+            format!("{}{}", if selected { "> " } else { "  " }, expr),
             &data[..],
             selected,
             self.get_relative_cursor_x(),
@@ -244,9 +250,10 @@ impl App {
         rect: Rect,
         instr: &TuiInstr,
         selected: bool,
+        odd: bool,
     ) -> Result<(), Box<dyn Error>> {
         match instr {
-            TuiInstr::Signal(id) => self.render_waveform(f, rect, id, selected)?,
+            TuiInstr::Signal(id) => self.render_waveform(f, rect, id, selected, odd)?,
             TuiInstr::Search(expr) => self.render_search(f, rect, expr, selected)?,
             TuiInstr::Error(line, err) => {
                 self.render_error(f, rect, format!("{}: {}", line, err), selected)
@@ -263,10 +270,13 @@ impl App {
         for (i, instr) in layout[self.window.y..].iter().enumerate() {
             let selected = i == cursor;
             match self.alloc_rect_instr(area, TuiInstr::height(instr) as u16) {
-                Ok(instr_rect) => match self.render_instr(f, instr_rect, &instr, selected) {
-                    Ok(_) => (),
-                    Err(err) => self.render_error(f, instr_rect, format!("{}", err), selected),
-                },
+                Ok(instr_rect) => {
+                    let odd = (self.window.y + i) & 1 == 1;
+                    match self.render_instr(f, instr_rect, &instr, selected, odd) {
+                        Ok(_) => (),
+                        Err(err) => self.render_error(f, instr_rect, format!("{}", err), selected),
+                    }
+                }
                 Err(_) => {
                     scrollable = true;
                     break;
@@ -274,10 +284,20 @@ impl App {
             }
         }
         let last_instr = Rect::new(self.area.x, self.height + 1, self.area.width, 1);
+        let default_signal_name = String::new();
+        let signal_name = match &self.layout[self.cursor.y] {
+            TuiInstr::Signal(id) => self
+                .signaldb
+                .sync_db
+                .get_signal_fullname(id)
+                .unwrap_or(default_signal_name),
+            _ => default_signal_name,
+        };
         let cursor_bar = CursorBar::new(
             CursorType::Bottom,
             self.cursor.x,
             self.scale,
+            signal_name,
             self.get_relative_cursor_x(),
             scrollable,
         );
@@ -386,6 +406,7 @@ impl App {
             CursorType::Top,
             self.cursor.x,
             self.scale,
+            String::new(),
             self.get_relative_cursor_x(),
             self.window.y > 0,
         );

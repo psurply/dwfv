@@ -34,7 +34,7 @@ impl<'a> SearchBar<'a> {
 
     fn findings_to_symbol(findings: &FindingsSummary) -> &'static str {
         match findings {
-            FindingsSummary::Nothing => " ",
+            FindingsSummary::Nothing => "·",
             FindingsSummary::Timestamp => line::VERTICAL,
             FindingsSummary::RangeBegin => line::VERTICAL_RIGHT,
             FindingsSummary::Range => line::HORIZONTAL,

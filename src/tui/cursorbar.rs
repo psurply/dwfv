@@ -15,6 +15,7 @@ pub struct CursorBar {
     cursor_type: CursorType,
     timestamp: Timestamp,
     scale: Timestamp,
+    signal_name: String,
     scrollable: bool,
     cursor: usize,
 }
@@ -24,6 +25,7 @@ impl CursorBar {
         cursor_type: CursorType,
         timestamp: Timestamp,
         scale: Timestamp,
+        signal_name: String,
         cursor: usize,
         scrollable: bool,
     ) -> CursorBar {
@@ -32,6 +34,7 @@ impl CursorBar {
             timestamp,
             cursor,
             scale,
+            signal_name,
             scrollable,
         }
     }
@@ -66,12 +69,16 @@ impl Widget for CursorBar {
         }
 
         let status = match self.cursor_type {
-            CursorType::Top => format!("↔ {}", self.scale.get_value()),
-            CursorType::Bottom => format!("I {}", self.timestamp.get_value()),
+            CursorType::Top => format!("↔ {}", self.scale),
+            CursorType::Bottom => format!("I ({}, {})", self.signal_name, self.timestamp),
         };
 
         buf.set_stringn(
-            (area.right() as usize - status.len() - 1) as u16,
+            if area.right() as usize > status.len() {
+                (area.right() as usize - status.len() - 1) as u16
+            } else {
+                area.left()
+            },
             area.top(),
             &status,
             status.len(),

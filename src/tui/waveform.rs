@@ -47,6 +47,7 @@ pub struct Waveform<'a> {
     selected: bool,
     cursor: usize,
     visual_cursor: Option<usize>,
+    odd: bool,
 }
 
 impl<'a> Waveform<'a> {
@@ -56,6 +57,7 @@ impl<'a> Waveform<'a> {
         selected: bool,
         cursor: usize,
         visual_cursor: Option<usize>,
+        odd: bool,
     ) -> Waveform<'a> {
         Waveform {
             data,
@@ -63,6 +65,7 @@ impl<'a> Waveform<'a> {
             selected,
             cursor,
             visual_cursor,
+            odd,
         }
     }
 }
@@ -81,6 +84,12 @@ impl<'a> Widget for Waveform<'a> {
                     Color::LightRed
                 } else {
                     Color::Red
+                }
+            } else if self.odd {
+                if self.selected {
+                    Color::LightCyan
+                } else {
+                    Color::Cyan
                 }
             } else if self.selected {
                 Color::LightGreen
@@ -114,7 +123,7 @@ impl<'a> Widget for Waveform<'a> {
                 .set_style(style);
         }
 
-        let mut elmts = self.data.iter().enumerate();
+        let mut elmts = self.data[1..].iter().enumerate();
         loop {
             let mut free_space = 0;
             let mut value = "";
@@ -133,13 +142,13 @@ impl<'a> Widget for Waveform<'a> {
                 }
 
                 let r = &c.to_string();
-                let symbol = if i >= free_space - 1 && i < value.len() {
+                let symbol = if i >= free_space - 1 && i + 1 < value.len() {
                     "…"
                 } else {
                     r
                 };
 
-                buf.get_mut(area.left() + (offset + i) as u16, area.top() + 1)
+                buf.get_mut(area.left() + (offset + i + 1) as u16, area.top() + 1)
                     .set_symbol(&symbol);
             }
         }
@@ -159,8 +168,8 @@ impl<'a> Widget for Waveform<'a> {
 
         buf.set_stringn(
             area.left(),
-            area.top(),
-            block::FULL_LOWER,
+            area.top() + 1,
+            block::FULL,
             area.width as usize,
             Style::default().fg(Color::DarkGray),
         );
@@ -173,7 +182,7 @@ impl<'a> Widget for Waveform<'a> {
         );
         buf.set_stringn(
             area.left(),
-            area.top() + 1,
+            area.top(),
             &self.name,
             area.width as usize,
             annot_style,
