@@ -1,43 +1,108 @@
 // SPDX-License-Identifier: MIT
-extern crate clap;
 extern crate dwfv;
+extern crate gumdrop;
 
-use clap::{crate_description, crate_version, App, Arg, ArgMatches, SubCommand};
 use dwfv::signaldb::{AsyncSignalDB, SignalDB};
 use dwfv::tui::Tui;
+use gumdrop::Options;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufReader};
 use std::process;
 
-fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
-    let file = File::open(args.value_of("INPUT").unwrap())?;
+/// A simple digital waveform viewer with vi-like key bindings
+#[derive(Debug, Options)]
+struct Args {
+    /// Prints help information
+    #[options()]
+    help: bool,
+
+    /// Prints version information
+    #[options(short = "V")]
+    version: bool,
+
+    /// Layout file to use in the TUI
+    #[options()]
+    layout: Option<String>,
+
+    /// Value Change Dump (VCD) file to parse
+    #[options()]
+    input: String,
+
+    /// Subcommands
+    #[options(command)]
+    command: Option<Command>,
+}
+
+/// Available subcommands
+#[derive(Debug, Options)]
+enum Command {
+    /// Displays states of the signals at a given timestamp
+    #[options()]
+    At(AtArgs),
+
+    /// Shows stats about the input
+    #[options()]
+    Stats(StatsArgs),
+
+    /// Displays the time periods when the specified expression is true
+    #[options()]
+    When(WhenArgs),
+}
+
+/// Displays states of the signals at a given timestamp
+#[derive(Debug, Options)]
+struct AtArgs {
+    #[options()]
+    help: bool,
+
+    #[options(free)]
+    timestamp: i64,
+}
+
+/// Shows stats about the input
+#[derive(Debug, Options)]
+struct StatsArgs {
+    #[options()]
+    help: bool,
+}
+
+/// Displays the time periods when the specified expression is true
+#[derive(Debug, Options)]
+struct WhenArgs {
+    #[options()]
+    help: bool,
+
+    #[options(free)]
+    expr: String,
+}
+
+fn run(args: Args) -> Result<(), Box<dyn Error>> {
+    let file = File::open(args.input)?;
     let buf_reader = BufReader::new(file);
 
-    if args.subcommand_matches("stats").is_some() {
-        let db = SignalDB::from_vcd(buf_reader)?;
-        db.format_stats(&mut io::stdout());
-    } else if let Some(matches) = args.subcommand_matches("at") {
-        let timestamp = matches
-            .value_of("TIMESTAMP")
-            .unwrap()
-            .parse()
-            .map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidInput, "TIMESTAMP must be an integer")
-            })?;
-        let db = SignalDB::from_vcd_with_limit(buf_reader, Some(timestamp))?;
-        db.format_values_at(&mut io::stdout(), timestamp);
-    } else if let Some(matches) = args.subcommand_matches("when") {
-        let expr = matches.value_of("EXPR").unwrap();
-        let mut db = SignalDB::from_vcd(buf_reader)?;
-        db.search_all(&mut io::stdout(), expr)?
+    if let Some(command) = args.command {
+        match command {
+            Command::At(AtArgs { timestamp, .. }) => {
+                let db = SignalDB::from_vcd_with_limit(buf_reader, Some(timestamp))?;
+                db.format_values_at(&mut io::stdout(), timestamp);
+            }
+            Command::Stats(_) => {
+                let db = SignalDB::from_vcd(buf_reader)?;
+                db.format_stats(&mut io::stdout());
+            }
+            Command::When(WhenArgs { expr, .. }) => {
+                let mut db = SignalDB::from_vcd(buf_reader)?;
+                db.search_all(&mut io::stdout(), &expr)?
+            }
+        }
     } else {
         let mut adb = AsyncSignalDB::new();
         adb.parse_vcd(buf_reader);
 
         adb.sync_db.wait_until_initialized()?;
         let mut tui = Tui::new(adb)?;
-        if let Some(layout) = args.value_of("layout") {
+        if let Some(layout) = args.layout {
             tui.update_layout(layout)?
         }
         tui.run()?
@@ -47,36 +112,19 @@ fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
 }
 
 fn main() {
-    let matches = App::new("dwfv")
-        .version(crate_version!())
-        .about(crate_description!())
-        .arg(
-            Arg::with_name("INPUT")
-                .help("Value Change Dump (VCD) file to parse")
-                .required(true)
-                .index(1),
-        )
-        .arg(
-            Arg::with_name("layout")
-                .short("l")
-                .value_name("LAYOUT")
-                .help("Layout file to use in the TUI")
-                .takes_value(true),
-        )
-        .subcommand(SubCommand::with_name("stats").about("Shows stats about the input"))
-        .subcommand(
-            SubCommand::with_name("at")
-                .about("Displays states of the signals at a given timestamp")
-                .arg(Arg::with_name("TIMESTAMP").required(true)),
-        )
-        .subcommand(
-            SubCommand::with_name("when")
-                .about("Displays the time periods when the specified expression is true")
-                .arg(Arg::with_name("EXPR").required(true)),
-        )
-        .get_matches();
+    let args = Args::parse_args_default_or_exit();
 
-    if let Err(e) = run(matches) {
+    if args.version {
+        println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
+    if args.input.is_empty() {
+        eprintln!("Error: missing required option `--input`");
+        process::exit(1);
+    }
+
+    if let Err(e) = run(args) {
         eprintln!("Error: {}", e);
         process::exit(1);
     }

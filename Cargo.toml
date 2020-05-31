@@ -27,7 +27,7 @@ travis-ci = { repository = "psurply/dwfv" }
 lalrpop = { version = "0.18", features = ["lexer"] }
 
 [dependencies]
-clap = "2"
+gumdrop = "0.8"
 lalrpop-util = "0.18"
 lazy_static = "1"
 regex = "1"
