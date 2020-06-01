@@ -25,11 +25,11 @@ exclude = [
 travis-ci = { repository = "psurply/dwfv" }
 
 [build-dependencies]
-lalrpop = { version = "0.18", features = ["lexer"] }
+lalrpop = { version = "0.19", features = ["lexer"] }
 
 [dependencies]
 gumdrop = "0.8"
-lalrpop-util = "0.18"
+lalrpop-util = "0.19"
 lazy_static = "1"
 regex = "1"
 tui = "0.9"
