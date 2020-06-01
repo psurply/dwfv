@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt;
 use std::io::prelude::*;
 
-pub struct Parser<'a, I: BufRead> {
+pub(crate) struct Parser<'a, I: BufRead> {
     lexer: Lexer<I>,
     signaldb: &'a SignalDB,
     scope: Vec<String>,
@@ -13,7 +13,7 @@ pub struct Parser<'a, I: BufRead> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct SyntaxError {
+pub(crate) struct SyntaxError {
     line: String,
 }
 
@@ -48,7 +48,7 @@ macro_rules! expect_token {
 }
 
 impl<'a, I: BufRead> Parser<'a, I> {
-    pub fn new(input: I, signaldb: &'a SignalDB) -> Parser<'a, I> {
+    pub(crate) fn new(input: I, signaldb: &'a SignalDB) -> Parser<'a, I> {
         Parser {
             lexer: Lexer::new(input),
             signaldb,
@@ -189,21 +189,21 @@ impl<'a, I: BufRead> Parser<'a, I> {
                         Ok(new_timescale * times as i64)
                     })
                 })
-            },
+            }
             Token::Timescale(new_timescale) => {
                 expect_token!(self, Context::Timescale, Token::Keyword(Keyword::End), {
                     Ok(new_timescale)
                 })
-            },
+            }
             _ => syntax_error!(self),
         }
     }
 
-    pub fn set_limit(&mut self, timestamp: i64) {
+    pub(crate) fn set_limit(&mut self, timestamp: i64) {
         self.limit = Some(timestamp)
     }
 
-    pub fn parse(&mut self) -> Result<(), SyntaxError> {
+    pub(crate) fn parse(&mut self) -> Result<(), SyntaxError> {
         let mut timescale = Timestamp::new(1, Scale::Picosecond);
         loop {
             match self.lexer.pop(Context::Stmt) {

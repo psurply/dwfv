@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 use super::symbols::arrow;
 use crate::signaldb::Timestamp;
-use tuirs::buffer::Buffer;
-use tuirs::layout::Rect;
-use tuirs::style::{Color, Style};
-use tuirs::widgets::Widget;
+use tui::buffer::Buffer;
+use tui::layout::Rect;
+use tui::style::{Color, Style};
+use tui::widgets::Widget;
 
 pub enum CursorType {
     Top,

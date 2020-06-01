@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 use super::symbols::block;
-use crate::search::search::FindingsSummary;
-use tuirs::buffer::Buffer;
-use tuirs::layout::Rect;
-use tuirs::style::{Color, Style};
-use tuirs::symbols::line;
-use tuirs::widgets::Widget;
+use crate::search::types::FindingsSummary;
+use tui::buffer::Buffer;
+use tui::layout::Rect;
+use tui::style::{Color, Style};
+use tui::symbols::line;
+use tui::widgets::Widget;
 
 pub struct SearchBar<'a> {
     data: &'a [FindingsSummary],

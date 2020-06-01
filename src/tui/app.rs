@@ -16,9 +16,9 @@ use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
-use tuirs::backend::Backend;
-use tuirs::layout::Rect;
-use tuirs::terminal::Frame;
+use tui::backend::Backend;
+use tui::layout::Rect;
+use tui::terminal::Frame;
 
 const MAX_ID_SIZE: usize = 28;
 const MAX_SCALE_VALUE: i64 = 1 << 16;

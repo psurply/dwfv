@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 use crate::signaldb::SignalValue;
-use search::expr::{ExprAst, ValueAst};
+use crate::search::expr::{ExprAst, ValueAst};
 use std::str::FromStr;
 
 grammar;

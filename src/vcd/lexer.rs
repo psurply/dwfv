@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 use crate::signaldb::{Scale, SignalValue, Timestamp};
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io::prelude::*;
 use std::str::FromStr;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Keyword {
+pub(crate) enum Keyword {
     Comment,
     Date,
     DumpVars,
@@ -20,7 +21,7 @@ pub enum Keyword {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
+pub(crate) enum Token {
     Word(String),
     Keyword(Keyword),
     Range(u64, u64),
@@ -35,7 +36,7 @@ pub enum Token {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum Context {
+pub(crate) enum Context {
     Comment,
     Stmt,
     Id,
@@ -45,8 +46,8 @@ pub enum Context {
     Timescale,
 }
 
-pub struct Lexer<I: BufRead> {
-    pub buf: String,
+pub(crate) struct Lexer<I: BufRead> {
+    pub(crate) buf: String,
     input: I,
     tok_queue: VecDeque<Token>,
 }
@@ -164,7 +165,7 @@ impl Token {
 }
 
 impl<I: BufRead> Lexer<I> {
-    pub fn new(input: I) -> Lexer<I> {
+    pub(crate) fn new(input: I) -> Lexer<I> {
         Lexer {
             input,
             buf: String::new(),
@@ -199,12 +200,12 @@ impl<I: BufRead> Lexer<I> {
         }
     }
 
-    pub fn pop(&mut self, ctx: Context) -> Token {
+    pub(crate) fn pop(&mut self, ctx: Context) -> Token {
         self.prepare_queue();
         self.tok_queue.pop_front().unwrap().retokenize(ctx)
     }
 
-    pub fn get_current_line(&self) -> String {
+    pub(crate) fn get_current_line(&self) -> String {
         self.buf.to_string()
     }
 }

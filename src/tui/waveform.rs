@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 use super::symbols::block;
-use tuirs::buffer::Buffer;
-use tuirs::layout::Rect;
-use tuirs::style::{Color, Modifier, Style};
-use tuirs::symbols::line;
-use tuirs::widgets::Widget;
+use tui::buffer::Buffer;
+use tui::layout::Rect;
+use tui::style::{Color, Modifier, Style};
+use tui::symbols::line;
+use tui::widgets::Widget;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum WaveformElement {

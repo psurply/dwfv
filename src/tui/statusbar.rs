@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-use tuirs::buffer::Buffer;
-use tuirs::layout::Rect;
-use tuirs::style::{Color, Modifier, Style};
-use tuirs::widgets::Widget;
+use tui::buffer::Buffer;
+use tui::layout::Rect;
+use tui::style::{Color, Modifier, Style};
+use tui::widgets::Widget;
 
 pub struct StatusBar {
     message: String,

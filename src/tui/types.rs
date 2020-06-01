@@ -6,8 +6,8 @@ use std::io;
 use std::path::Path;
 use termion::input::MouseTerminal;
 use termion::raw::{IntoRawMode, RawTerminal};
-use tuirs::backend::TermionBackend;
-use tuirs::Terminal;
+use tui::backend::TermionBackend;
+use tui::Terminal;
 
 /// Digital Waveform Viewer Text User Interface
 pub struct Tui {

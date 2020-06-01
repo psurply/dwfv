@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 use crate::signaldb::SignalValue;
+use lalrpop_util::lalrpop_mod;
 use std::error::Error;
 use std::io;
 
@@ -24,7 +25,7 @@ pub enum ExprAst {
 }
 
 impl ExprAst {
-    pub fn from_str(expr: &str) -> Result<ExprAst, Box<dyn Error>> {
+    pub(crate) fn from_str(expr: &str) -> Result<ExprAst, Box<dyn Error>> {
         let ast = parser::ExprParser::new().parse(expr).map_err(|err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
