@@ -5,7 +5,7 @@ use std::error::Error;
 use std::io;
 use std::ops::{BitAnd, BitOr};
 
-pub struct Search {
+pub(crate) struct Search {
     findings: Vec<TimeDescr>,
     expr: ExprAst,
     current_period: Option<Timestamp>,
@@ -87,7 +87,7 @@ pub enum FindingsSummary {
 }
 
 impl Search {
-    pub fn new(expr: &str) -> Result<Search, Box<dyn Error>> {
+    pub(crate) fn new(expr: &str) -> Result<Search, Box<dyn Error>> {
         let search = Search {
             expr: ExprAst::from_str(expr)?,
             findings: Vec::new(),
@@ -97,7 +97,7 @@ impl Search {
         Ok(search)
     }
 
-    pub fn eval_value_at(
+    pub(crate) fn eval_value_at(
         &self,
         value: &ValueAst,
         signaldb: &SignalDB,
@@ -174,7 +174,7 @@ impl Search {
         Ok(res)
     }
 
-    pub fn search_all(&mut self, signaldb: &SignalDB) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn search_all(&mut self, signaldb: &SignalDB) -> Result<(), Box<dyn Error>> {
         self.findings.clear();
         self.current_period = None;
         for timestamp in signaldb.get_timestamps() {
@@ -184,7 +184,7 @@ impl Search {
         Ok(())
     }
 
-    pub fn search_at(
+    pub(crate) fn search_at(
         &mut self,
         signaldb: &SignalDB,
         timestamp: Timestamp,
@@ -215,11 +215,11 @@ impl Search {
         Ok(())
     }
 
-    pub fn finish(&mut self) {
+    pub(crate) fn finish(&mut self) {
         self.cursor = None
     }
 
-    pub fn format_findings(&self, output: &mut dyn io::Write) {
+    pub(crate) fn format_findings(&self, output: &mut dyn io::Write) {
         for timestamp in &self.findings {
             let _ = writeln!(output, "{}", timestamp);
         }
@@ -240,7 +240,7 @@ impl Search {
         })
     }
 
-    pub fn findings_between(&self, begin: Timestamp, end: Timestamp) -> FindingsSummary {
+    pub(crate) fn findings_between(&self, begin: Timestamp, end: Timestamp) -> FindingsSummary {
         if let Some(current_period) = self.current_period {
             if begin <= current_period && current_period < end {
                 return FindingsSummary::RangeBegin;
@@ -304,7 +304,7 @@ impl Search {
         }
     }
 
-    pub fn get_next_finding(&self, from: Timestamp) -> Option<Timestamp> {
+    pub(crate) fn get_next_finding(&self, from: Timestamp) -> Option<Timestamp> {
         let index = match self.search_finding(from) {
             Ok(index) => index + 1,
             Err(index) => index,
@@ -326,7 +326,7 @@ impl Search {
             })
     }
 
-    pub fn get_end_of_next_finding(&self, from: Timestamp) -> Option<Timestamp> {
+    pub(crate) fn get_end_of_next_finding(&self, from: Timestamp) -> Option<Timestamp> {
         let index = match self.search_finding(from) {
             Ok(index) => index + 1,
             Err(index) => index,
@@ -337,7 +337,7 @@ impl Search {
         })
     }
 
-    pub fn get_previous_finding(&self, from: Timestamp) -> Option<Timestamp> {
+    pub(crate) fn get_previous_finding(&self, from: Timestamp) -> Option<Timestamp> {
         let index = match self.search_finding(from - from.derive(1)) {
             Ok(index) => index,
             Err(index) => {
@@ -365,14 +365,14 @@ impl Search {
             })
     }
 
-    pub fn get_first_finding(&self) -> Option<Timestamp> {
+    pub(crate) fn get_first_finding(&self) -> Option<Timestamp> {
         self.findings.first().map(|x| match x {
             TimeDescr::Point(t) => *t,
             TimeDescr::Period(t, _) => *t,
         })
     }
 
-    pub fn get_last_finding(&self) -> Option<Timestamp> {
+    pub(crate) fn get_last_finding(&self) -> Option<Timestamp> {
         self.findings.last().map(|x| match x {
             TimeDescr::Point(t) => *t,
             TimeDescr::Period(_, t) => *t,

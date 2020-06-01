@@ -1,7 +1,4 @@
 // SPDX-License-Identifier: MIT
-extern crate dwfv;
-extern crate gumdrop;
-
 use dwfv::signaldb::{AsyncSignalDB, SignalDB};
 use dwfv::tui::Tui;
 use gumdrop::Options;

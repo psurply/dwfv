@@ -7,7 +7,7 @@ pub mod instr;
 mod searchbar;
 mod statusbar;
 mod symbols;
-mod tui;
+mod types;
 mod waveform;
 
-pub use crate::tui::tui::Tui;
+pub use self::types::Tui;

@@ -398,7 +398,7 @@ impl fmt::Display for Signal {
 #[cfg(test)]
 mod test {
     use super::*;
-    use signaldb::time::Scale;
+    use crate::signaldb::time::Scale;
 
     #[test]
     fn add_events() {
