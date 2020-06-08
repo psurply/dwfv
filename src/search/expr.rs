@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
+use super::parser;
 use crate::signaldb::SignalValue;
-use lalrpop_util::lalrpop_mod;
 use std::error::Error;
 use std::io;
-
-lalrpop_mod!(parser, "/search/parser.rs");
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ValueAst {
@@ -26,7 +24,7 @@ pub enum ExprAst {
 
 impl ExprAst {
     pub(crate) fn from_str(expr: &str) -> Result<ExprAst, Box<dyn Error>> {
-        let ast = parser::ExprParser::new().parse(expr).map_err(|err| {
+        let (_, ast) = parser::expr(expr).map_err(|err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("Syntax Error: {:?}", err),

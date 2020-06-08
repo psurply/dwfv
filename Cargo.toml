@@ -24,13 +24,10 @@ exclude = [
 [badges]
 travis-ci = { repository = "psurply/dwfv" }
 
-[build-dependencies]
-lalrpop = { version = "0.19", features = ["lexer"] }
-
 [dependencies]
 gumdrop = "0.8"
-lalrpop-util = "0.19"
 lazy_static = "1"
+nom = { version = "5.1", default-features = false, features = ["std"] }
 regex = "1"
 tui = "0.9"
 termion = "1.5"
