@@ -40,7 +40,7 @@ fn is_identifier(input: char) -> bool {
 
 // Combinators
 
-/// Call a parser with optional whitespace/comments on either side.
+/// Call a parser with optional whitespace on either side.
 fn token<'a, O, F>(parser: F) -> impl Fn(&'a str) -> ParseResult<&'a str, O>
 where
     F: Fn(&'a str) -> ParseResult<&'a str, O>,
