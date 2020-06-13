@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 use crate::signaldb::{Scale, SignalValue, Timestamp};
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::collections::VecDeque;
 use std::io::prelude::*;
 use std::str::FromStr;
@@ -100,12 +98,19 @@ impl Token {
     }
 
     fn retokenize_range(word: &str) -> Option<Token> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new("^\\[([[:digit:]]+):([[:digit:]]+)\\]$").unwrap();
+        if !word.starts_with("[") || !word.ends_with("]") {
+            return None;
         }
 
-        RE.captures(word)
-            .map(|cap| Token::Range(cap[1].parse().unwrap(), cap[2].parse().unwrap()))
+        let mut iter = word[1..word.len() - 1].split(":");
+        let start = iter.next()?.parse().ok()?;
+        let end = iter.next()?.parse().ok()?;
+
+        if let Some(_) = iter.next() {
+            return None;
+        }
+
+        Some(Token::Range(start, end))
     }
 
     fn retokenize_id_range(word: &str) -> Option<Token> {
@@ -122,16 +127,22 @@ impl Token {
     }
 
     fn retokenize_timescale(word: &str) -> Option<Token> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new("^([[:digit:]]*)([munpf]?s)$").unwrap();
+        if !word.ends_with("ms")
+            && !word.ends_with("us")
+            && !word.ends_with("ns")
+            && !word.ends_with("ps")
+            && !word.ends_with("fs")
+            && !word.ends_with("s")
+        {
+            return None;
         }
 
-        RE.captures(word).map(|cap| {
-            Token::Timescale(Timestamp::new(
-                cap[1].parse().unwrap_or(1),
-                Scale::from_str(&cap[2]).unwrap(),
-            ))
-        })
+        let end = word.chars().position(|ch| !ch.is_numeric())?;
+
+        Some(Token::Timescale(Timestamp::new(
+            word[..end].parse().unwrap_or(1),
+            Scale::from_str(&word[end..]).unwrap(),
+        )))
     }
 
     fn retokenize(self, ctx: Context) -> Token {
