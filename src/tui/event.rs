@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: MIT
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::collections::VecDeque;
 use std::io;
 use termion::event::Event as RawEvent;
@@ -177,40 +175,28 @@ impl Events {
     ];
 
     fn parse_buffer(&mut self) -> Result<(), ()> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new("(?P<i>[1-9][0-9]*)?(?P<cmd_buff>.*)?").unwrap();
+        let end = self
+            .buffer
+            .chars()
+            .position(|ch| !ch.is_numeric())
+            .ok_or(())?;
+        let repeat = self.buffer[..end].parse().unwrap_or(1);
+        let cmd_buff = self.buffer[end..].to_string();
+
+        let mut cmd = Event::None;
+        for (name, action) in Events::CMDS.iter() {
+            if cmd_buff.contains(name) {
+                cmd = action(self)
+            }
         }
 
-        let buf = self.buffer.clone();
-        if let Some(cap) = RE.captures(&buf) {
-            let mut cmd = Event::None;
-            if let Some(cmd_buff) = cap.name("cmd_buff") {
-                let cmd_buff = cmd_buff.as_str().to_string();
-                for (name, action) in Events::CMDS.iter() {
-                    if cmd_buff.contains(name) {
-                        cmd = action(self)
-                    }
-                }
-            } else {
-                return Err(());
-            }
-
-            let repeat = if let Some(i) = cap.name("i") {
-                i.as_str().parse().unwrap()
-            } else {
-                1
-            };
-
-            if let Event::None = cmd {
-                Err(())
-            } else {
-                for _ in 0..repeat {
-                    self.events.push_back(cmd.clone())
-                }
-                Ok(())
-            }
-        } else {
+        if let Event::None = cmd {
             Err(())
+        } else {
+            for _ in 0..repeat {
+                self.events.push_back(cmd.clone())
+            }
+            Ok(())
         }
     }
 
