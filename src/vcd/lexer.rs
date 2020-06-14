@@ -98,15 +98,15 @@ impl Token {
     }
 
     fn retokenize_range(word: &str) -> Option<Token> {
-        if !word.starts_with("[") || !word.ends_with("]") {
+        if !word.starts_with('[') || !word.ends_with(']') {
             return None;
         }
 
-        let mut iter = word[1..word.len() - 1].split(":");
+        let mut iter = word[1..word.len() - 1].split(':');
         let start = iter.next()?.parse().ok()?;
         let end = iter.next()?.parse().ok()?;
 
-        if let Some(_) = iter.next() {
+        if iter.next().is_some() {
             return None;
         }
 
@@ -132,7 +132,7 @@ impl Token {
             && !word.ends_with("ns")
             && !word.ends_with("ps")
             && !word.ends_with("fs")
-            && !word.ends_with("s")
+            && !word.ends_with('s')
         {
             return None;
         }

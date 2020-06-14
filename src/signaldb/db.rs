@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::error::Error;
 use std::fmt;
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex};
 
 /// Signal Database
@@ -26,8 +27,8 @@ pub struct SignalDB {
     now: Mutex<Timestamp>,
     searches: Mutex<HashMap<String, Search>>,
     status: Mutex<String>,
-    initialized: (Mutex<bool>, Condvar),
-    valid: Mutex<bool>,
+    initialized: (Mutex<AtomicBool>, Condvar),
+    valid: AtomicBool,
     timescale: Mutex<Timestamp>,
 }
 
@@ -132,8 +133,8 @@ impl SignalDB {
             now: Mutex::new(Timestamp::origin()),
             searches: Mutex::new(HashMap::new()),
             status: Mutex::new(String::from("Test")),
-            initialized: (Mutex::new(false), Condvar::new()),
-            valid: Mutex::new(true),
+            initialized: (Mutex::new(AtomicBool::new(false)), Condvar::new()),
+            valid: AtomicBool::new(true),
             timescale: Mutex::new(Timestamp::new(1, Scale::Picosecond)),
         }
     }
@@ -322,8 +323,8 @@ impl SignalDB {
     /// ```
     pub fn mark_as_initialized(&self) {
         let &(ref lock, ref cvar) = &self.initialized;
-        let mut initialized = lock.lock().unwrap();
-        *initialized = true;
+        let initialized = lock.lock().unwrap();
+        (*initialized).store(true, Ordering::Relaxed);
         cvar.notify_all()
     }
 
@@ -340,14 +341,12 @@ impl SignalDB {
     /// assert_eq!(db.is_valid(), false);
     /// ```
     pub fn mark_as_invalid(&self) {
-        let mut valid = self.valid.lock().unwrap();
-        *valid = false
+        self.valid.store(false, Ordering::Relaxed)
     }
 
     /// Check that the content of the `SignalDB` has not be been marked as invalid.
     pub fn is_valid(&self) -> bool {
-        let valid = self.valid.lock().unwrap();
-        *valid
+        self.valid.load(Ordering::Relaxed)
     }
 
     /// Wait until the `SignalDB` is marked as initialized and check that the content has not been
@@ -372,11 +371,10 @@ impl SignalDB {
     pub fn wait_until_initialized(&self) -> Result<(), InitializationError> {
         let &(ref lock, ref cvar) = &self.initialized;
         let mut initialized = lock.lock().unwrap();
-        while !*initialized {
+        while !(*initialized).load(Ordering::Relaxed) {
             initialized = cvar.wait(initialized).unwrap()
         }
-        let valid = self.valid.lock().unwrap();
-        if *valid {
+        if self.valid.load(Ordering::Relaxed) {
             Ok(())
         } else {
             Err(InitializationError::new(&self.get_status()))
