@@ -8,7 +8,7 @@ DWFV
 A simple digital waveform viewer with vi-like key bindings.
 
 ```shell
-$ dwfv -i sample.vcd
+$ dwfv sample.vcd
 ```
 
 ![screenshot](docs/screenshot.png)
@@ -99,7 +99,7 @@ Command-Line Interface
 ### Show some stats about the VCD file
 
 ```shell
-$ dwfv -i examples/sample.vcd stats
+$ dwfv examples/sample.vcd --stats
 test
   ! (value) - width: 8, edges: 37, from: 0, to: 1010
   " (clk) - width: 1, edges: 102, from: 0, to: 1010
@@ -113,7 +113,7 @@ test
 ### Display values of the signal at a given time
 
 ```shell
-$ dwfv -i sample.vcd at 42
+$ dwfv sample.vcd --at 42
 test
   ! (value) = h07
   " (clk) -> h0
@@ -127,10 +127,10 @@ test
 ### Search in the waveforms
 
 ```shell
-$ dwfv -i sample.vcd when '$! = 2'
+$ dwfv sample.vcd --when '$! = 2'
 310-330
 650-670
-$ dwfv -i sample.vcd when '$! <- 4'
+$ dwfv sample.vcd --when '$! <- 4'
 350
 690
 ```
