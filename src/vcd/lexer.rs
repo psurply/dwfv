@@ -212,8 +212,12 @@ impl<I: BufRead> Lexer<I> {
     }
 
     pub(crate) fn pop(&mut self, ctx: Context) -> Token {
-        self.prepare_queue();
-        self.tok_queue.pop_front().unwrap().retokenize(ctx)
+        loop {
+            self.prepare_queue();
+            if let Some(tok) = self.tok_queue.pop_front() {
+                return tok.retokenize(ctx);
+            }
+        }
     }
 
     pub(crate) fn get_current_line(&self) -> String {
@@ -242,5 +246,14 @@ mod test {
         assert_eq!(l.pop(Context::Stmt), Token::Word("Hello".to_string()));
         assert_eq!(l.pop(Context::Stmt), Token::Word("$world".to_string()));
         assert_eq!(l.pop(Context::Stmt), Token::Keyword(Keyword::End));
+        assert_eq!(l.pop(Context::Stmt), Token::Eof);
+    }
+
+    #[test]
+    fn empty_lines() {
+        let input = BufReader::new("   \n$end".as_bytes());
+        let mut l = Lexer::new(input);
+        assert_eq!(l.pop(Context::Stmt), Token::Keyword(Keyword::End));
+        assert_eq!(l.pop(Context::Stmt), Token::Eof);
     }
 }
