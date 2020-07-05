@@ -3,7 +3,7 @@ use super::symbols::arrow;
 use crate::signaldb::Timestamp;
 use tui::buffer::Buffer;
 use tui::layout::Rect;
-use tui::style::{Color, Style};
+use tui::style::Style;
 use tui::widgets::Widget;
 
 pub enum CursorType {
@@ -42,7 +42,7 @@ impl CursorBar {
 
 impl Widget for CursorBar {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let style = Style::default().fg(Color::Gray).bg(Color::Black);
+        let style = Style::default();
 
         for i in 0..area.width {
             buf.get_mut(area.left() + i, area.top()).set_style(style);

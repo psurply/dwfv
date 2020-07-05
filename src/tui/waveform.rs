@@ -104,10 +104,10 @@ impl<'a> Widget for Waveform<'a> {
                 {
                     Color::Blue
                 } else {
-                    Color::Black
+                    Color::Reset
                 }
             } else {
-                Color::Black
+                Color::Reset
             };
             let style = Style::default().fg(fg).bg(bg);
 
