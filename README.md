@@ -101,38 +101,67 @@ Command-Line Interface
 ```shell
 $ dwfv examples/sample.vcd --stats
 test
-  ! (value) - width: 8, edges: 37, from: 0, to: 1010
-  " (clk) - width: 1, edges: 102, from: 0, to: 1010
-  # (reset) - width: 1, edges: 5, from: 0, to: 620
+  ! (value) - width: 8, edges: 37, from: 0s, to: 1010s
+  " (clk) - width: 1, edges: 102, from: 0s, to: 1010s
+  # (reset) - width: 1, edges: 5, from: 0s, to: 620s
   c1
-    " (clk) - width: 1, edges: 102, from: 0, to: 1010
-    # (reset) - width: 1, edges: 5, from: 0, to: 620
-    $ (out) - width: 8, edges: 37, from: 0, to: 1010
+    " (clk) - width: 1, edges: 102, from: 0s, to: 1010s
+    # (reset) - width: 1, edges: 5, from: 0s, to: 620s
+    $ (out) - width: 8, edges: 37, from: 0s, to: 1010s
 ```
 
-### Display values of the signal at a given time
+### Display values of the signals at a given time
 
 ```shell
-$ dwfv sample.vcd --at 42
+$ dwfv sample.vcd --at 1337
 test
-  ! (value) = h07
-  " (clk) -> h0
+  ! (value) = h14
+  " (clk) -> h1
   # (reset) = h0
   c1
-    " (clk) -> h0
+    " (clk) -> h1
     # (reset) = h0
-    $ (out) = h07
+    $ (out) = h14
 ```
 
 ### Search in the waveforms
 
+Events in the waveforms can be searched using the '--when' option. Examples:
+
+- Searching when the `value` signal is equal to `2`:
+
 ```shell
 $ dwfv sample.vcd --when '$! = 2'
-310-330
-650-670
+310s-330s
+650s-670s
+$ dwfv sample.vcd --when '$! equals h2'
+310s-330s
+650s-670s
+```
+
+- Searching when the `value` signal transitions to `4`:
+
+```shell
 $ dwfv sample.vcd --when '$! <- 4'
-350
-690
+350s
+690s
+$ dwfv sample.vcd --when '$! becomes b100'
+350s
+690s
+```
+
+- Searching when the `value` signal transitions to `4` after 400s:
+
+```shell
+$ dwfv sample.vcd --when '$! <- 4 and after 400'
+690s
+```
+
+- Searching when the `value` signal transitions to `4` before 400s:
+
+```shell
+$ dwfv sample.vcd --when '$! <- 4 and before 400'
+350s
 ```
 
 LICENSE

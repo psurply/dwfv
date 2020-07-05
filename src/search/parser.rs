@@ -1,4 +1,50 @@
 // SPDX-License-Identifier: MIT
+
+/// Grammar of the search expressions:
+///
+/// ```ebnf
+/// expr =
+///     expr, "or", expr_tier
+///     | expr_tier
+///     ;
+///
+/// expr_tier =
+///     expr_tier, "and", expr_term
+///     | expr_tier, "nand", expr_term
+///     ;
+///
+/// expr_term =
+///     left_value, equal, right_value
+///     | left_value, not_equal, right_value
+///     | left_value, transition, right_value
+///     | "after" dec_value
+///     | "before" dec_value
+///     | left_value
+///     | "(" expr ")"
+///     ;
+///
+/// equal = "is" | "equals" | "=";
+/// not_equal = "is not", "!=";
+/// transition = "becomes", "<-";
+///
+/// left_value = id;
+/// right_value =
+///     literal_value
+///     | left_value
+///     | "(" right_value ")"
+///     ;
+///
+/// literal_value =
+///     dec_value
+///     | bin_value
+///     | hex_value
+///     ;
+///
+/// id = \$[[:graph:]]+;
+/// bin_value = b[01uzw-]+;
+/// hex_value = h[0-9A-Fa-f]+;
+/// dec_value = [0-9]+;
+/// ```
 use super::expr::{ExprAst, ValueAst};
 use crate::signaldb::SignalValue;
 use nom::{
