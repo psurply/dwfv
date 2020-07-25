@@ -455,7 +455,9 @@ impl SignalDB {
         }
         {
             let mut signals = self.signals.lock().unwrap();
-            signals.insert(signal.id.clone(), signal);
+            if signals.get(&signal.id).is_none() {
+                signals.insert(signal.id.clone(), signal);
+            }
         }
     }
 
@@ -1247,8 +1249,8 @@ impl SignalDB {
             }
             match node {
                 ScopeChild::Signal => signals.get(name).unwrap().format_stats(output),
-                ScopeChild::Scope(scope) => {
-                    let _ = writeln!(output, "{}", scope.name);
+                ScopeChild::Scope => {
+                    let _ = writeln!(output, "{}", name);
                 }
             }
         })
@@ -1290,8 +1292,8 @@ impl SignalDB {
                     .get(name)
                     .unwrap()
                     .format_value_at(output, timestamp),
-                ScopeChild::Scope(scope) => {
-                    let _ = writeln!(output, "{}", scope.name);
+                ScopeChild::Scope => {
+                    let _ = writeln!(output, "{}", name);
                 }
             }
         })

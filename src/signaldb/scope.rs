@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 use super::signal::Signal;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug)]
 pub enum ScopeChild {
     Signal,
-    Scope(Scope),
+    Scope,
 }
 
 #[derive(Debug)]
 pub struct Scope {
     pub name: String,
-    children: BTreeMap<String, ScopeChild>,
+    signals: BTreeSet<String>,
+    scopes: BTreeMap<String, Scope>,
     path: Vec<String>,
 }
 
@@ -19,40 +20,34 @@ impl Scope {
     pub fn new(name: String) -> Scope {
         Scope {
             name,
-            children: BTreeMap::new(),
+            signals: BTreeSet::new(),
+            scopes: BTreeMap::new(),
             path: Vec::new(),
         }
     }
 
     pub fn add_scope(&mut self, path: &[&str]) {
         if let Some(name) = path.first() {
-            match self.children.get(*name) {
+            match self.scopes.get(*name) {
                 Some(_) => self.get_scope(*name).unwrap().add_scope(&path[1..]),
                 None => {
                     let mut s = Scope::new(name.to_string());
                     s.path = self.path.clone();
                     s.path.push(self.name.clone());
                     s.add_scope(&path[1..]);
-                    self.children.insert(s.name.clone(), ScopeChild::Scope(s));
+                    self.scopes.insert(s.name.clone(), s);
                 }
             }
         }
     }
 
-    fn get_child(&mut self, name: &str) -> Option<&mut ScopeChild> {
-        self.children.get_mut(name)
-    }
-
     pub fn get_scope(&mut self, name: &str) -> Option<&mut Scope> {
-        self.get_child(name).map(|child| match child {
-            ScopeChild::Scope(next) => next,
-            _ => panic!("Specified path is a signal, not a scope"),
-        })
+        self.scopes.get_mut(name)
     }
 
     pub fn get_scope_by_path(&mut self, path: &[&str]) -> Option<&mut Scope> {
         match path.first() {
-            Some(name) => match self.children.get(*name) {
+            Some(name) => match self.scopes.get(*name) {
                 Some(_) => self.get_scope(name).unwrap().get_scope_by_path(&path[1..]),
                 None => None,
             },
@@ -61,18 +56,19 @@ impl Scope {
     }
 
     pub fn add_signal(&mut self, signal: &mut Signal) {
-        self.children.insert(signal.id.clone(), ScopeChild::Signal);
+        self.signals.insert(signal.id.clone());
         signal.path = self.path.clone();
         signal.path.push(self.name.clone())
     }
 
     fn _traverse<T, F: FnMut(&str, &ScopeChild, u64) -> T>(&self, depth: u64, f: &mut F) {
-        for (name, child) in &self.children {
-            f(name, child, depth);
-            match child {
-                ScopeChild::Signal => (),
-                ScopeChild::Scope(scope) => scope._traverse(depth + 1, f),
-            }
+        for name in &self.signals {
+            f(name, &ScopeChild::Signal, depth);
+        }
+
+        for (name, scope) in &self.scopes {
+            f(name, &ScopeChild::Scope, depth);
+            scope._traverse(depth + 1, f);
         }
     }
 
@@ -89,6 +85,10 @@ mod test {
     fn scope() {
         let mut s = Scope::new(String::from("top"));
         s.add_scope(&["foo", "bar"]);
+
+        let foo = s.get_scope_by_path(&["foo"]).expect("Path doesn't exist");
+        foo.add_signal(&mut Signal::new("bar", "bar", 42));
+
         s.get_scope_by_path(&["foo", "bar"])
             .expect("Path doesn't exist");
     }
