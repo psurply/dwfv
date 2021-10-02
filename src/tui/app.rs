@@ -751,7 +751,7 @@ impl App {
             } else {
                 buf.push_str(&format!("{}, ", instr))
             }
-        };
+        }
 
         let mut s = String::new();
         let mut counter = 1;
