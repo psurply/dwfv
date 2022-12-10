@@ -24,8 +24,14 @@ exclude = [
 [badges]
 travis-ci = { repository = "psurply/dwfv" }
 
+[features]
+default = ["cli"]
+cli = ["gumdrop", "tui", "termion"]
+
 [dependencies]
-gumdrop = "0.8"
 nom = { version = "5.1", default-features = false, features = ["std"] }
-tui = "0.9"
-termion = "1.5"
+
+# For feature `cli`
+gumdrop = { version = "0.8", optional = true }
+tui = { version = "0.9", optional = true }
+termion = { version = "1.5", optional = true }

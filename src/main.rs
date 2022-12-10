@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 // SPDX-License-Identifier: MIT
 use dwfv::signaldb::{AsyncSignalDB, SignalDB};
 use dwfv::tui::Tui;
