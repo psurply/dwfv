@@ -8,6 +8,9 @@ use std::str::FromStr;
 pub(crate) enum Keyword {
     Comment,
     Date,
+    DumpAll,
+    DumpOff,
+    DumpOn,
     DumpVars,
     End,
     EndDefinitions,
@@ -55,6 +58,9 @@ impl Token {
         let kw = match word {
             "$comment" => Some(Keyword::Comment),
             "$date" => Some(Keyword::Date),
+            "$dumpall" => Some(Keyword::DumpAll),
+            "$dumpoff" => Some(Keyword::DumpOff),
+            "$dumpon" => Some(Keyword::DumpOn),
             "$dumpvars" => Some(Keyword::DumpVars),
             "$end" => Some(Keyword::End),
             "$enddefinitions" => Some(Keyword::EndDefinitions),
