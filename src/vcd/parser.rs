@@ -213,7 +213,9 @@ impl<'a, I: BufRead> Parser<'a, I> {
                         self.signaldb.mark_as_initialized();
                         self.parse_comment()?
                     }
-                    Keyword::DumpVars => self.parse_dumpvars()?,
+                    Keyword::DumpAll | Keyword::DumpOff | Keyword::DumpOn | Keyword::DumpVars => {
+                        self.parse_dumpvars()?
+                    }
                     Keyword::Scope => self.parse_scope()?,
                     Keyword::Var => self.parse_var()?,
                     Keyword::Upscope => self.parse_upscope()?,
