@@ -23,7 +23,7 @@ impl Widget for StatusBar {
         let style = Style::default()
             .fg(Color::White)
             .bg(Color::DarkGray)
-            .modifier(Modifier::BOLD);
+            .add_modifier(Modifier::BOLD);
 
         for i in 0..area.width {
             buf.get_mut(area.left() + i, area.top()).set_style(style);
