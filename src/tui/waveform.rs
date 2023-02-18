@@ -160,7 +160,7 @@ impl<'a> Widget for Waveform<'a> {
             } else {
                 Color::Black
             })
-            .modifier(if self.selected {
+            .add_modifier(if self.selected {
                 Modifier::BOLD
             } else {
                 Modifier::empty()
