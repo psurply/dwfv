@@ -29,7 +29,7 @@ default = ["cli"]
 cli = ["gumdrop", "tui", "termion"]
 
 [dependencies]
-nom = { version = "7", default-features = false, features = ["std"] }
+nom = { version = "8", default-features = false, features = ["std"] }
 
 # For feature `cli`
 gumdrop = { version = "0.8", optional = true }

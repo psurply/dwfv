@@ -48,16 +48,15 @@
 use super::expr::{ExprAst, ValueAst};
 use crate::signaldb::SignalValue;
 use nom::{
+    IResult,
+    Parser,
     branch::alt,
     bytes::complete::{tag, take, take_while, take_while1, take_while_m_n},
     combinator::{opt, recognize},
-    error::VerboseError,
     sequence::{delimited, pair, preceded, separated_pair},
-    IResult,
+    error::Error,
 };
 use std::str::FromStr;
-
-type ParseResult<I, O> = IResult<I, O, VerboseError<I>>;
 
 // Check functions
 
@@ -87,9 +86,9 @@ fn is_identifier(input: char) -> bool {
 // Combinators
 
 /// Call a parser with optional whitespace on either side.
-fn token<'a, O, F>(parser: F) -> impl FnMut(&'a str) -> ParseResult<&'a str, O>
+fn token<'a, O, F>(parser: F) -> impl Parser<&'a str, Output = O, Error = Error<&'a str>>
 where
-    F: Fn(&'a str) -> ParseResult<&'a str, O>,
+    F: Fn(&'a str) -> IResult<&'a str, O>,
 {
     delimited(opt(whitespace), parser, opt(whitespace))
 }
@@ -97,38 +96,38 @@ where
 // Parsers
 
 /// Recognize whitespace.
-fn whitespace(input: &str) -> ParseResult<&str, &str> {
+fn whitespace(input: &str) -> IResult<&str, &str> {
     take_while1(char::is_whitespace)(input)
 }
 
 /// Recognize an expression.
-pub(crate) fn expr(input: &str) -> ParseResult<&str, ExprAst> {
-    alt((or, tier))(input)
+pub(crate) fn expr(input: &str) -> IResult<&str, ExprAst> {
+    alt((or, tier)).parse(input)
 }
 
 /// Recognize a tiered expression.
-fn tier(input: &str) -> ParseResult<&str, ExprAst> {
-    alt((and, nand, term))(input)
+fn tier(input: &str) -> IResult<&str, ExprAst> {
+    alt((and, nand, term)).parse(input)
 }
 
 /// Recognize an expression term.
-fn term(input: &str) -> ParseResult<&str, ExprAst> {
-    alt((parens, equal, not_equal, transition, before, after, any))(input)
+fn term(input: &str) -> IResult<&str, ExprAst> {
+    alt((parens, equal, not_equal, transition, before, after, any)).parse(input)
 }
 
 /// Recognize an expression in parentheses.
-fn parens(input: &str) -> ParseResult<&str, ExprAst> {
-    delimited(tag("("), expr, tag(")"))(input)
+fn parens(input: &str) -> IResult<&str, ExprAst> {
+    delimited(tag("("), expr, tag(")")).parse(input)
 }
 
 /// Recognize a number.
-fn number(input: &str) -> ParseResult<&str, ValueAst> {
+fn number(input: &str) -> IResult<&str, ValueAst> {
     recognize(alt((
         pair(tag("b"), take_while1(is_binary_digit)),
         pair(tag("h"), take_while1(is_hex_digit)),
         pair(tag("0"), take(0_usize)),
         pair(take_while_m_n(1, 1, is_digit_start), take_while(is_digit)),
-    )))(input)
+    ))).parse(input)
     .map(|(rest, value)| {
         let value = match &value[..1] {
             "b" => SignalValue::from_str(&value[1..]).unwrap(),
@@ -141,37 +140,38 @@ fn number(input: &str) -> ParseResult<&str, ValueAst> {
 }
 
 /// Recognize a decimal number.
-fn decimal(input: &str) -> ParseResult<&str, i64> {
+fn decimal(input: &str) -> IResult<&str, i64> {
     recognize(alt((
         pair(tag("0"), take(0_usize)),
         pair(take_while_m_n(1, 1, is_digit_start), take_while(is_digit)),
-    )))(input)
+    ))).parse(input)
     .map(|(rest, value)| (rest, value.parse().unwrap()))
 }
 
 /// Recognize an identifier.
-fn identifier(input: &str) -> ParseResult<&str, ValueAst> {
-    preceded(tag("$"), take_while1(is_identifier))(input)
+fn identifier(input: &str) -> IResult<&str, ValueAst> {
+    preceded(tag("$"), take_while1(is_identifier))
+        .parse(input)
         .map(|(rest, id)| (rest, ValueAst::Id(id.to_string())))
 }
 
 /// Recognize a value in parentheses.
-fn value_parens(input: &str) -> ParseResult<&str, ValueAst> {
-    delimited(tag("("), value, tag(")"))(input)
+fn value_parens(input: &str) -> IResult<&str, ValueAst> {
+    delimited(tag("("), value, tag(")")).parse(input)
 }
 
 /// Recognize a value.
-fn value(input: &str) -> ParseResult<&str, ValueAst> {
-    alt((number, identifier, value_parens))(input)
+fn value(input: &str) -> IResult<&str, ValueAst> {
+    alt((number, identifier, value_parens)).parse(input)
 }
 
 /// Recognize an equivalence condition.
-fn equal(input: &str) -> ParseResult<&str, ExprAst> {
+fn equal(input: &str) -> IResult<&str, ExprAst> {
     separated_pair(
         token(identifier),
         alt((tag("="), tag("is"), tag("equals"))),
         token(value),
-    )(input)
+    ).parse(input)
     .map(|(rest, (left, right))| {
         let left = match left {
             ValueAst::Id(id) => id,
@@ -183,12 +183,12 @@ fn equal(input: &str) -> ParseResult<&str, ExprAst> {
 }
 
 /// Recognize a non-equivalence condition.
-fn not_equal(input: &str) -> ParseResult<&str, ExprAst> {
+fn not_equal(input: &str) -> IResult<&str, ExprAst> {
     separated_pair(
         token(identifier),
         alt((tag("!="), tag("is not"))),
         token(value),
-    )(input)
+    ).parse(input)
     .map(|(rest, (left, right))| {
         let left = match left {
             ValueAst::Id(id) => id,
@@ -200,12 +200,12 @@ fn not_equal(input: &str) -> ParseResult<&str, ExprAst> {
 }
 
 /// Recognize a transition.
-fn transition(input: &str) -> ParseResult<&str, ExprAst> {
+fn transition(input: &str) -> IResult<&str, ExprAst> {
     separated_pair(
         token(identifier),
         alt((tag("<-"), tag("becomes"))),
         token(value),
-    )(input)
+    ).parse(input)
     .map(|(rest, (left, right))| {
         let left = match left {
             ValueAst::Id(id) => id,
@@ -217,8 +217,8 @@ fn transition(input: &str) -> ParseResult<&str, ExprAst> {
 }
 
 /// Recognize any transition.
-fn any(input: &str) -> ParseResult<&str, ExprAst> {
-    token(identifier)(input).map(|(rest, value)| {
+fn any(input: &str) -> IResult<&str, ExprAst> {
+    token(identifier).parse(input).map(|(rest, value)| {
         let value = match value {
             ValueAst::Id(id) => id,
             _ => unreachable!(),
@@ -229,14 +229,14 @@ fn any(input: &str) -> ParseResult<&str, ExprAst> {
 }
 
 /// Recognize a logical and.
-fn and(input: &str) -> ParseResult<&str, ExprAst> {
-    separated_pair(token(term), tag("and"), token(tier))(input)
+fn and(input: &str) -> IResult<&str, ExprAst> {
+    separated_pair(token(term), tag("and"), token(tier)).parse(input)
         .map(|(rest, (left, right))| (rest, ExprAst::And(Box::new(left), Box::new(right))))
 }
 
 /// Recognize a logical nand.
-fn nand(input: &str) -> ParseResult<&str, ExprAst> {
-    separated_pair(token(term), tag("nand"), token(tier))(input).map(|(rest, (left, right))| {
+fn nand(input: &str) -> IResult<&str, ExprAst> {
+    separated_pair(token(term), tag("nand"), token(tier)).parse(input).map(|(rest, (left, right))| {
         let value = ExprAst::And(Box::new(left), Box::new(right));
 
         (rest, ExprAst::Not(Box::new(value)))
@@ -244,19 +244,21 @@ fn nand(input: &str) -> ParseResult<&str, ExprAst> {
 }
 
 /// Recognize a logical or.
-fn or(input: &str) -> ParseResult<&str, ExprAst> {
-    separated_pair(token(term), tag("or"), token(tier))(input)
+fn or(input: &str) -> IResult<&str, ExprAst> {
+    separated_pair(token(term), tag("or"), token(tier)).parse(input)
         .map(|(rest, (left, right))| (rest, ExprAst::Or(Box::new(left), Box::new(right))))
 }
 
 /// Recognize an after duration.
-fn after(input: &str) -> ParseResult<&str, ExprAst> {
-    preceded(token(tag("after")), decimal)(input).map(|(rest, value)| (rest, ExprAst::After(value)))
+fn after(input: &str) -> IResult<&str, ExprAst> {
+    preceded(token(tag("after")), decimal)
+        .parse(input)
+        .map(|(rest, value)| (rest, ExprAst::After(value)))
 }
 
 /// Recognize a before duration.
-fn before(input: &str) -> ParseResult<&str, ExprAst> {
-    preceded(token(tag("before")), decimal)(input)
+fn before(input: &str) -> IResult<&str, ExprAst> {
+    preceded(token(tag("before")), decimal).parse(input)
         .map(|(rest, value)| (rest, ExprAst::Before(value)))
 }
 
@@ -264,19 +266,15 @@ fn before(input: &str) -> ParseResult<&str, ExprAst> {
 mod test {
     use super::*;
     use crate::signaldb::BitValue::{self, High, HighZ, Low, Undefined};
-    use nom::error::{
-        ErrorKind::{Alt, Tag, TakeWhileMN},
-        VerboseErrorKind::{self, Nom},
-    };
-
-    fn nom_error<'a>(errors: Vec<(&'a str, VerboseErrorKind)>) -> nom::Err<VerboseError<&'a str>> {
-        nom::Err::Error(VerboseError { errors })
-    }
+    use nom::error::ErrorKind::{Tag, TakeWhileMN};
+    use nom::error::{Error, ErrorKind};
+    use nom::Err;
 
     fn make_error<'a, Output>(
-        errors: Vec<(&'a str, VerboseErrorKind)>,
-    ) -> ParseResult<&'a str, Output> {
-        Err(nom_error(errors))
+        input: &'a str,
+        code: ErrorKind,
+    ) -> IResult<&'a str, Output> {
+        Err(Err::Error(Error { input, code }))
     }
 
     fn make_id(id: &str) -> ValueAst {
@@ -306,19 +304,19 @@ mod test {
 
         assert_eq!(
             number(""),
-            make_error(vec![("", Nom(TakeWhileMN)), ("", Nom(Alt))])
+            make_error("", TakeWhileMN)
         );
         assert_eq!(
             number(" "),
-            make_error(vec![(" ", Nom(TakeWhileMN)), (" ", Nom(Alt))])
+            make_error(" ", TakeWhileMN)
         );
         assert_eq!(
             number("b2"),
-            make_error(vec![("b2", Nom(TakeWhileMN)), ("b2", Nom(Alt))])
+            make_error("b2", TakeWhileMN)
         );
         assert_eq!(
             number("$a"),
-            make_error(vec![("$a", Nom(TakeWhileMN)), ("$a", Nom(Alt))])
+            make_error("$a", TakeWhileMN)
         );
     }
 
@@ -328,10 +326,10 @@ mod test {
         assert_eq!(identifier("$abc"), Ok(("", make_id("abc"))));
         assert_eq!(identifier("$.*"), Ok(("", make_id(".*"))));
 
-        assert_eq!(identifier(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(identifier(" "), make_error(vec![(" ", Nom(Tag))]));
-        assert_eq!(identifier("0"), make_error(vec![("0", Nom(Tag))]));
-        assert_eq!(identifier("a"), make_error(vec![("a", Nom(Tag))]));
+        assert_eq!(identifier(""), make_error("", Tag));
+        assert_eq!(identifier(" "), make_error(" ", Tag));
+        assert_eq!(identifier("0"), make_error("0", Tag));
+        assert_eq!(identifier("a"), make_error("a", Tag));
     }
 
     #[test]
@@ -339,15 +337,9 @@ mod test {
         assert_eq!(value("$foo123 bar"), Ok((" bar", make_id("foo123"))));
         assert_eq!(value("hdz"), Ok(("z", make_literal(13))));
 
-        assert_eq!(value(""), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
-        assert_eq!(
-            value(" "),
-            make_error(vec![(" ", Nom(Tag)), (" ", Nom(Alt))])
-        );
-        assert_eq!(
-            value("a"),
-            make_error(vec![("a", Nom(Tag)), ("a", Nom(Alt))])
-        );
+        assert_eq!(value(""), make_error("", Tag));
+        assert_eq!(value(" "), make_error(" ", Tag));
+        assert_eq!(value("a"), make_error("a", Tag));
     }
 
     #[test]
@@ -371,12 +363,12 @@ mod test {
             ))
         );
 
-        assert_eq!(equal(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(equal(" "), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(equal("bz = bz"), make_error(vec![("bz = bz", Nom(Tag))]));
+        assert_eq!(equal(""), make_error("", Tag));
+        assert_eq!(equal(" "), make_error("", Tag));
+        assert_eq!(equal("bz = bz"), make_error("bz = bz", Tag));
         assert_eq!(
             equal("foo = bar"),
-            make_error(vec![("foo = bar", Nom(Tag))])
+            make_error("foo = bar", Tag)
         );
     }
 
@@ -403,15 +395,15 @@ mod test {
             ))
         );
 
-        assert_eq!(not_equal(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(not_equal(" "), make_error(vec![("", Nom(Tag))]));
+        assert_eq!(not_equal(""), make_error("", Tag));
+        assert_eq!(not_equal(" "), make_error("", Tag));
         assert_eq!(
             not_equal("bz != bz"),
-            make_error(vec![("bz != bz", Nom(Tag))])
+            make_error("bz != bz", Tag)
         );
         assert_eq!(
             not_equal("foo != bar"),
-            make_error(vec![("foo != bar", Nom(Tag))])
+            make_error("foo != bar", Tag)
         );
     }
 
@@ -432,15 +424,15 @@ mod test {
             ))
         );
 
-        assert_eq!(transition(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(transition(" "), make_error(vec![("", Nom(Tag))]));
+        assert_eq!(transition(""), make_error("", Tag));
+        assert_eq!(transition(" "), make_error("", Tag));
         assert_eq!(
             transition("bz <- bz"),
-            make_error(vec![("bz <- bz", Nom(Tag))])
+            make_error("bz <- bz", Tag)
         );
         assert_eq!(
             transition("foo becomes bar"),
-            make_error(vec![("foo becomes bar", Nom(Tag))])
+            make_error("foo becomes bar", Tag)
         );
     }
 
@@ -455,16 +447,16 @@ mod test {
             Ok(("", ExprAst::AnyTransition(".*".to_string())))
         );
 
-        assert_eq!(any(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(any(" "), make_error(vec![("", Nom(Tag))]));
+        assert_eq!(any(""), make_error("", Tag));
+        assert_eq!(any(" "), make_error("", Tag));
     }
 
     #[test]
     fn test_after() {
         assert_eq!(after("after 12 foo"), Ok((" foo", ExprAst::After(12))));
 
-        assert_eq!(after(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(after(" "), make_error(vec![("", Nom(Tag))]));
+        assert_eq!(after(""), make_error("", Tag));
+        assert_eq!(after(" "), make_error("", Tag));
     }
 
     #[test]
@@ -472,8 +464,8 @@ mod test {
         assert_eq!(before("before 2"), Ok(("", ExprAst::Before(2))));
         assert_eq!(before("before 23 foo"), Ok((" foo", ExprAst::Before(23))));
 
-        assert_eq!(before(""), make_error(vec![("", Nom(Tag))]));
-        assert_eq!(before(" "), make_error(vec![("", Nom(Tag))]));
+        assert_eq!(before(""), make_error("", Tag));
+        assert_eq!(before(" "), make_error("", Tag));
     }
 
     #[test]
@@ -499,8 +491,8 @@ mod test {
             ))
         );
 
-        assert_eq!(and(""), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
-        assert_eq!(and(" "), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
+        assert_eq!(and(""), make_error("", Tag));
+        assert_eq!(and(" "), make_error("", Tag));
     }
 
     #[test]
@@ -516,8 +508,8 @@ mod test {
             ))
         );
 
-        assert_eq!(or(""), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
-        assert_eq!(or(" "), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
+        assert_eq!(or(""), make_error("", Tag));
+        assert_eq!(or(" "), make_error("", Tag));
     }
 
     #[test]
@@ -537,7 +529,7 @@ mod test {
             ))
         );
 
-        assert_eq!(or(""), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
-        assert_eq!(or(" "), make_error(vec![("", Nom(Tag)), ("", Nom(Alt))]));
+        assert_eq!(or(""), make_error("", Tag));
+        assert_eq!(or(" "), make_error("", Tag));
     }
 }
