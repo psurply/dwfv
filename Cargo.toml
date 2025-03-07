@@ -34,4 +34,4 @@ nom = { version = "8", default-features = false, features = ["std"] }
 # For feature `cli`
 gumdrop = { version = "0.8", optional = true }
 tui = { version = "0.19", optional = true, default-features = false, features = ["termion"] }
-termion = { version = "1.5", optional = true }
+termion = { version = "4.0", optional = true }

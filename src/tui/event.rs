@@ -334,6 +334,7 @@ impl Events {
                                     self.events.push_back(Event::Yank);
                                     self.clear_buffer()
                                 }
+                                _ => (),
                             },
                             MouseEvent::Release(x, _) => {
                                 if let InputMode::Visual = self.mode {
