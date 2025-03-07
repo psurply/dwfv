@@ -1,7 +1,7 @@
 DWFV
 ====
 
-[![Build Status](https://travis-ci.com/psurply/dwfv.svg?branch=master)](https://travis-ci.com/psurply/dwfv)
+[![CI](https://github.com/psurply/dwfv/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/psurply/dwfv/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/dwfv)](https://crates.io/crates/dwfv)
 [![Docs Status](https://docs.rs/dwfv/badge.svg)](https://docs.rs/crate/dwfv/)
 
