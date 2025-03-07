@@ -22,7 +22,7 @@ checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
 
 [[package]]
 name = "dwfv"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "gumdrop",
  "nom",
