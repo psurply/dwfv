@@ -6,7 +6,7 @@ authors = ["Pierre Surply <pierre.surply@gmail.com>"]
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/psurply/dwfv"
-edition = "2018"
+edition = "2024"
 
 keywords = ["eda", "vcd"]
 categories = [
