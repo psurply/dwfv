@@ -29,7 +29,7 @@ impl Scope {
     pub fn add_scope(&mut self, path: &[&str]) {
         if let Some(name) = path.first() {
             match self.scopes.get(*name) {
-                Some(_) => self.get_scope(*name).unwrap().add_scope(&path[1..]),
+                Some(_) => self.get_scope(name).unwrap().add_scope(&path[1..]),
                 None => {
                     let mut s = Scope::new(name.to_string());
                     s.path = self.path.clone();

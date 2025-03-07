@@ -14,6 +14,7 @@ pub enum SearchTarget {
     Event,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone)]
 pub enum Event {
     None,
@@ -67,6 +68,8 @@ pub struct Events {
     mode: InputMode,
 }
 
+type Command = &'static dyn Fn(&mut Events) -> Event;
+
 impl Events {
     pub fn new() -> Events {
         Events {
@@ -78,19 +81,11 @@ impl Events {
     }
 
     pub fn in_visual_mode(&self) -> bool {
-        if let InputMode::Visual = self.mode {
-            true
-        } else {
-            false
-        }
+        matches!(self.mode, InputMode::Visual)
     }
 
     pub fn in_search_mode(&self) -> bool {
-        if let InputMode::Search(_) = self.mode {
-            true
-        } else {
-            false
-        }
+        matches!(self.mode, InputMode::Search(_))
     }
 
     pub fn get_search_target(&self) -> SearchTarget {
@@ -107,7 +102,7 @@ impl Events {
         self.buffer.clear()
     }
 
-    const CMDS: [(&'static str, &'static dyn Fn(&mut Events) -> Event); 35] = [
+    const CMDS: [(&'static str, Command); 35] = [
         ("j", &|_| Event::Down),
         ("k", &|_| Event::Up),
         ("l", &|_| Event::Right),

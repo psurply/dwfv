@@ -322,7 +322,7 @@ impl SignalDB {
     /// db.mark_as_initialized()
     /// ```
     pub fn mark_as_initialized(&self) {
-        let &(ref lock, ref cvar) = &self.initialized;
+        let (lock, cvar) = &self.initialized;
         let initialized = lock.lock().unwrap();
         (*initialized).store(true, Ordering::Relaxed);
         cvar.notify_all()
@@ -369,7 +369,7 @@ impl SignalDB {
     /// db.wait_until_initialized();
     /// ```
     pub fn wait_until_initialized(&self) -> Result<(), InitializationError> {
-        let &(ref lock, ref cvar) = &self.initialized;
+        let (lock, cvar) = &self.initialized;
         let mut initialized = lock.lock().unwrap();
         while !(*initialized).load(Ordering::Relaxed) {
             initialized = cvar.wait(initialized).unwrap()
@@ -998,10 +998,10 @@ impl SignalDB {
     ///     "1337ps\n"
     /// );
     /// ```
-    pub fn search_all<'a>(
+    pub fn search_all(
         &mut self,
         output: &mut dyn io::Write,
-        expr: &'a str,
+        expr: &str,
     ) -> Result<(), Box<dyn Error>> {
         let mut search = Search::new(expr)?;
         search.search_all(self)?;
@@ -1070,7 +1070,7 @@ impl SignalDB {
     ///     FindingsSummary::Complex(2)
     /// );
     /// ```
-    pub fn search<'a>(&self, expr: &'a str) -> Result<(), Box<dyn Error>> {
+    pub fn search(&self, expr: &str) -> Result<(), Box<dyn Error>> {
         let mut search = Search::new(expr)?;
         search.search_all(self)?;
         {
@@ -1082,7 +1082,7 @@ impl SignalDB {
 
     /// Allocate a new search object in the `SignalDB` but don't perform actual search.
     /// This is meant to be used for asynchronous searches (see `AsyncSignalDB`)
-    pub fn search_init<'a>(&self, expr: &'a str) -> Result<(), Box<dyn Error>> {
+    pub fn search_init(&self, expr: &str) -> Result<(), Box<dyn Error>> {
         let mut searches = self.searches.lock().unwrap();
         let search = Search::new(expr)?;
         searches.insert(expr.to_string(), search);
@@ -1094,10 +1094,10 @@ impl SignalDB {
     /// This is meant to be used for asynchronous searches (see `AsyncSignalDB`)
     pub fn search_at(&self, expr: &str, timestamp: Timestamp) -> Result<(), Box<dyn Error>> {
         let mut searches = self.searches.lock().unwrap();
-        Ok(searches
+        searches
             .get_mut(expr)
             .ok_or_else(|| SearchNotFound::new(expr))?
-            .search_at(self, timestamp)?)
+            .search_at(self, timestamp)
     }
 
     /// Indicate that a search object isn't active anymore.

@@ -52,7 +52,7 @@ impl<'a> SearchBar<'a> {
     }
 }
 
-impl<'a> Widget for SearchBar<'a> {
+impl Widget for SearchBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         for (i, elmt) in self.data.iter().enumerate() {
             let fg = if i == self.cursor {

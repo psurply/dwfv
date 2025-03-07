@@ -54,10 +54,9 @@ impl AsyncSignalDB {
     /// db.parse_vcd(vcd);
     /// db.sync_db.wait_until_initialized();
     /// ```
-    pub fn parse_vcd<I: io::BufRead>(&mut self, input: I)
+    pub fn parse_vcd<I>(&mut self, input: I)
     where
-        I: std::marker::Send,
-        I: 'static,
+        I: io::BufRead + std::marker::Send + 'static,
     {
         let db_parse = Arc::clone(&self.sync_db);
         self.workers.push(thread::spawn(move || {

@@ -221,7 +221,7 @@ impl SignalValue {
     /// ```
     pub fn expand(&mut self, width: usize) {
         if let SignalValue::Literal(literal, _) = self {
-            let mut expand_value = *literal.get(0).unwrap_or(&BitValue::High);
+            let mut expand_value = *literal.first().unwrap_or(&BitValue::High);
             if expand_value == BitValue::High {
                 expand_value = BitValue::Low
             }

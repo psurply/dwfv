@@ -335,7 +335,7 @@ b0 #
             .as_bytes(),
         );
         let mut db = SignalDB::new();
-        let mut p = Parser::new(input, &mut db);
+        let mut p = Parser::new(input, &db);
         assert_eq!(p.parse(), Ok(()))
     }
 }

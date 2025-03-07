@@ -57,9 +57,9 @@ impl Scale {
     }
 }
 
-impl convert::Into<i64> for Scale {
-    fn into(self) -> i64 {
-        match self {
+impl convert::From<Scale> for i64 {
+    fn from(val: Scale) -> Self {
+        match val {
             Scale::Second => 1000_0000_0000_0000,
             Scale::Millisecond => 1_0000_0000_0000,
             Scale::Microsecond => 10_0000_0000,
@@ -152,19 +152,15 @@ impl Timestamp {
     }
 
     fn scale_down(self) -> Option<Timestamp> {
-        if let Some(new_scale) = self.scale.scale_down() {
-            Some(self.rescale(new_scale))
-        } else {
-            None
-        }
+        self.scale
+            .scale_down()
+            .map(|new_scale| self.rescale(new_scale))
     }
 
     fn scale_up(self) -> Option<Timestamp> {
-        if let Some(new_scale) = self.scale.scale_up() {
-            Some(self.rescale(new_scale))
-        } else {
-            None
-        }
+        self.scale
+            .scale_up()
+            .map(|new_scale| self.rescale(new_scale))
     }
 
     pub fn derive(self, value: i64) -> Timestamp {

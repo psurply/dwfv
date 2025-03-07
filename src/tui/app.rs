@@ -11,8 +11,8 @@ use std::cmp::{self, Ordering};
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::prelude::*;
 use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
@@ -272,7 +272,7 @@ impl App {
             match self.alloc_rect_instr(area, TuiInstr::height(instr) as u16) {
                 Ok(instr_rect) => {
                     let odd = (self.window.y + i) & 1 == 1;
-                    match self.render_instr(f, instr_rect, &instr, selected, odd) {
+                    match self.render_instr(f, instr_rect, instr, selected, odd) {
                         Ok(_) => (),
                         Err(err) => self.render_error(f, instr_rect, format!("{}", err), selected),
                     }
@@ -491,7 +491,7 @@ impl App {
         for instr in layout.iter() {
             match instr {
                 TuiInstr::Search(expr) => {
-                    self.signaldb.search(&expr);
+                    self.signaldb.search(expr);
                     reviewed_layout.push(instr.clone())
                 }
                 TuiInstr::Signal(signal) => {
@@ -520,12 +520,12 @@ impl App {
             TuiInstr::Signal(id) => self
                 .signaldb
                 .sync_db
-                .get_next_rising_edge(&id, self.cursor.x)
+                .get_next_rising_edge(id, self.cursor.x)
                 .unwrap(),
             TuiInstr::Search(expr) => self
                 .signaldb
                 .sync_db
-                .get_next_finding(&expr, self.cursor.x)
+                .get_next_finding(expr, self.cursor.x)
                 .unwrap(),
             _ => None,
         };
@@ -542,12 +542,12 @@ impl App {
             TuiInstr::Signal(id) => self
                 .signaldb
                 .sync_db
-                .get_next_falling_edge(&id, self.cursor.x)
+                .get_next_falling_edge(id, self.cursor.x)
                 .unwrap(),
             TuiInstr::Search(expr) => self
                 .signaldb
                 .sync_db
-                .get_end_of_next_finding(&expr, self.cursor.x)
+                .get_end_of_next_finding(expr, self.cursor.x)
                 .unwrap(),
             _ => None,
         };
@@ -564,12 +564,12 @@ impl App {
             TuiInstr::Signal(id) => self
                 .signaldb
                 .sync_db
-                .get_previous_rising_edge(&id, self.cursor.x)
+                .get_previous_rising_edge(id, self.cursor.x)
                 .unwrap_or(None),
             TuiInstr::Search(expr) => self
                 .signaldb
                 .sync_db
-                .get_previous_finding(&expr, self.cursor.x)
+                .get_previous_finding(expr, self.cursor.x)
                 .unwrap_or(None),
             _ => None,
         };
@@ -583,11 +583,11 @@ impl App {
 
     fn goto_first_event(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => self.signaldb.sync_db.get_first_event(&id).unwrap_or(None),
+            TuiInstr::Signal(id) => self.signaldb.sync_db.get_first_event(id).unwrap_or(None),
             TuiInstr::Search(expr) => self
                 .signaldb
                 .sync_db
-                .get_first_finding(&expr)
+                .get_first_finding(expr)
                 .unwrap_or(None),
             _ => None,
         };
@@ -601,12 +601,8 @@ impl App {
 
     fn goto_last_event(&mut self) {
         let res = match &self.layout[self.cursor.y] {
-            TuiInstr::Signal(id) => self.signaldb.sync_db.get_last_event(&id).unwrap_or(None),
-            TuiInstr::Search(expr) => self
-                .signaldb
-                .sync_db
-                .get_last_finding(&expr)
-                .unwrap_or(None),
+            TuiInstr::Signal(id) => self.signaldb.sync_db.get_last_event(id).unwrap_or(None),
+            TuiInstr::Search(expr) => self.signaldb.sync_db.get_last_finding(expr).unwrap_or(None),
             _ => None,
         };
         if let Some(t) = res {
@@ -632,18 +628,15 @@ impl App {
     fn zoom_fit(&mut self) {
         let period = match &self.layout[self.cursor.y] {
             TuiInstr::Signal(id) => Some((
-                self.signaldb.sync_db.get_first_event(&id).unwrap_or(None),
-                self.signaldb.sync_db.get_last_event(&id).unwrap_or(None),
+                self.signaldb.sync_db.get_first_event(id).unwrap_or(None),
+                self.signaldb.sync_db.get_last_event(id).unwrap_or(None),
             )),
             TuiInstr::Search(expr) => Some((
                 self.signaldb
                     .sync_db
-                    .get_first_finding(&expr)
+                    .get_first_finding(expr)
                     .unwrap_or(None),
-                self.signaldb
-                    .sync_db
-                    .get_last_finding(&expr)
-                    .unwrap_or(None),
+                self.signaldb.sync_db.get_last_finding(expr).unwrap_or(None),
             )),
             _ => None,
         };
@@ -680,7 +673,7 @@ impl App {
             return;
         }
         for (i, instr) in self.layout[self.cursor.y + 1..].iter().enumerate() {
-            if self.matches_search_pattern(&instr) {
+            if self.matches_search_pattern(instr) {
                 self.cursor.y += i + 1;
                 self.adjust_window();
                 self.center_window_vertical();
@@ -762,7 +755,7 @@ impl App {
                 if *prev_instr == *instr {
                     counter += 1
                 } else {
-                    format_instr(&mut s, &prev_instr, counter);
+                    format_instr(&mut s, prev_instr, counter);
                     counter = 1;
                     prev_instr_opt = Some(instr.clone())
                 }
@@ -839,7 +832,7 @@ impl App {
                     self.center_window_vertical()
                 }
                 Event::GotoTop => self.cursor.y = 0,
-                Event::GotoLast => self.cursor.y = std::usize::MAX,
+                Event::GotoLast => self.cursor.y = usize::MAX,
                 Event::GotoNextRisingEdge => self.goto_next_rising_edge(),
                 Event::GotoNextFallingEdge => self.goto_next_falling_edge(),
                 Event::GotoPreviousRisingEdge => self.goto_previous_rising_edge(),

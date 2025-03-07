@@ -48,13 +48,12 @@
 use super::expr::{ExprAst, ValueAst};
 use crate::signaldb::SignalValue;
 use nom::{
-    IResult,
-    Parser,
+    IResult, Parser,
     branch::alt,
-    bytes::complete::{tag, take, take_while, take_while1, take_while_m_n},
+    bytes::complete::{tag, take, take_while, take_while_m_n, take_while1},
     combinator::{opt, recognize},
-    sequence::{delimited, pair, preceded, separated_pair},
     error::Error,
+    sequence::{delimited, pair, preceded, separated_pair},
 };
 use std::str::FromStr;
 
@@ -69,10 +68,7 @@ fn is_digit(input: char) -> bool {
 }
 
 fn is_binary_digit(input: char) -> bool {
-    match input {
-        '0' | '1' | 'u' | 'z' | 'w' | '-' => true,
-        _ => false,
-    }
+    matches!(input, '0' | '1' | 'u' | 'z' | 'w' | '-')
 }
 
 fn is_hex_digit(input: char) -> bool {
@@ -127,7 +123,8 @@ fn number(input: &str) -> IResult<&str, ValueAst> {
         pair(tag("h"), take_while1(is_hex_digit)),
         pair(tag("0"), take(0_usize)),
         pair(take_while_m_n(1, 1, is_digit_start), take_while(is_digit)),
-    ))).parse(input)
+    )))
+    .parse(input)
     .map(|(rest, value)| {
         let value = match &value[..1] {
             "b" => SignalValue::from_str(&value[1..]).unwrap(),
@@ -144,7 +141,8 @@ fn decimal(input: &str) -> IResult<&str, i64> {
     recognize(alt((
         pair(tag("0"), take(0_usize)),
         pair(take_while_m_n(1, 1, is_digit_start), take_while(is_digit)),
-    ))).parse(input)
+    )))
+    .parse(input)
     .map(|(rest, value)| (rest, value.parse().unwrap()))
 }
 
@@ -171,7 +169,8 @@ fn equal(input: &str) -> IResult<&str, ExprAst> {
         token(identifier),
         alt((tag("="), tag("is"), tag("equals"))),
         token(value),
-    ).parse(input)
+    )
+    .parse(input)
     .map(|(rest, (left, right))| {
         let left = match left {
             ValueAst::Id(id) => id,
@@ -188,7 +187,8 @@ fn not_equal(input: &str) -> IResult<&str, ExprAst> {
         token(identifier),
         alt((tag("!="), tag("is not"))),
         token(value),
-    ).parse(input)
+    )
+    .parse(input)
     .map(|(rest, (left, right))| {
         let left = match left {
             ValueAst::Id(id) => id,
@@ -205,7 +205,8 @@ fn transition(input: &str) -> IResult<&str, ExprAst> {
         token(identifier),
         alt((tag("<-"), tag("becomes"))),
         token(value),
-    ).parse(input)
+    )
+    .parse(input)
     .map(|(rest, (left, right))| {
         let left = match left {
             ValueAst::Id(id) => id,
@@ -230,22 +231,26 @@ fn any(input: &str) -> IResult<&str, ExprAst> {
 
 /// Recognize a logical and.
 fn and(input: &str) -> IResult<&str, ExprAst> {
-    separated_pair(token(term), tag("and"), token(tier)).parse(input)
+    separated_pair(token(term), tag("and"), token(tier))
+        .parse(input)
         .map(|(rest, (left, right))| (rest, ExprAst::And(Box::new(left), Box::new(right))))
 }
 
 /// Recognize a logical nand.
 fn nand(input: &str) -> IResult<&str, ExprAst> {
-    separated_pair(token(term), tag("nand"), token(tier)).parse(input).map(|(rest, (left, right))| {
-        let value = ExprAst::And(Box::new(left), Box::new(right));
+    separated_pair(token(term), tag("nand"), token(tier))
+        .parse(input)
+        .map(|(rest, (left, right))| {
+            let value = ExprAst::And(Box::new(left), Box::new(right));
 
-        (rest, ExprAst::Not(Box::new(value)))
-    })
+            (rest, ExprAst::Not(Box::new(value)))
+        })
 }
 
 /// Recognize a logical or.
 fn or(input: &str) -> IResult<&str, ExprAst> {
-    separated_pair(token(term), tag("or"), token(tier)).parse(input)
+    separated_pair(token(term), tag("or"), token(tier))
+        .parse(input)
         .map(|(rest, (left, right))| (rest, ExprAst::Or(Box::new(left), Box::new(right))))
 }
 
@@ -258,7 +263,8 @@ fn after(input: &str) -> IResult<&str, ExprAst> {
 
 /// Recognize a before duration.
 fn before(input: &str) -> IResult<&str, ExprAst> {
-    preceded(token(tag("before")), decimal).parse(input)
+    preceded(token(tag("before")), decimal)
+        .parse(input)
         .map(|(rest, value)| (rest, ExprAst::Before(value)))
 }
 
@@ -266,14 +272,11 @@ fn before(input: &str) -> IResult<&str, ExprAst> {
 mod test {
     use super::*;
     use crate::signaldb::BitValue::{self, High, HighZ, Low, Undefined};
+    use nom::Err;
     use nom::error::ErrorKind::{Tag, TakeWhileMN};
     use nom::error::{Error, ErrorKind};
-    use nom::Err;
 
-    fn make_error<'a, Output>(
-        input: &'a str,
-        code: ErrorKind,
-    ) -> IResult<&'a str, Output> {
+    fn make_error<Output>(input: &str, code: ErrorKind) -> IResult<&str, Output> {
         Err(Err::Error(Error { input, code }))
     }
 
@@ -302,22 +305,10 @@ mod test {
         assert_eq!(number("01"), Ok(("1", make_literal(0))));
         assert_eq!(number("42"), Ok(("", make_literal(42))));
 
-        assert_eq!(
-            number(""),
-            make_error("", TakeWhileMN)
-        );
-        assert_eq!(
-            number(" "),
-            make_error(" ", TakeWhileMN)
-        );
-        assert_eq!(
-            number("b2"),
-            make_error("b2", TakeWhileMN)
-        );
-        assert_eq!(
-            number("$a"),
-            make_error("$a", TakeWhileMN)
-        );
+        assert_eq!(number(""), make_error("", TakeWhileMN));
+        assert_eq!(number(" "), make_error(" ", TakeWhileMN));
+        assert_eq!(number("b2"), make_error("b2", TakeWhileMN));
+        assert_eq!(number("$a"), make_error("$a", TakeWhileMN));
     }
 
     #[test]
@@ -366,10 +357,7 @@ mod test {
         assert_eq!(equal(""), make_error("", Tag));
         assert_eq!(equal(" "), make_error("", Tag));
         assert_eq!(equal("bz = bz"), make_error("bz = bz", Tag));
-        assert_eq!(
-            equal("foo = bar"),
-            make_error("foo = bar", Tag)
-        );
+        assert_eq!(equal("foo = bar"), make_error("foo = bar", Tag));
     }
 
     #[test]
@@ -397,14 +385,8 @@ mod test {
 
         assert_eq!(not_equal(""), make_error("", Tag));
         assert_eq!(not_equal(" "), make_error("", Tag));
-        assert_eq!(
-            not_equal("bz != bz"),
-            make_error("bz != bz", Tag)
-        );
-        assert_eq!(
-            not_equal("foo != bar"),
-            make_error("foo != bar", Tag)
-        );
+        assert_eq!(not_equal("bz != bz"), make_error("bz != bz", Tag));
+        assert_eq!(not_equal("foo != bar"), make_error("foo != bar", Tag));
     }
 
     #[test]
@@ -426,10 +408,7 @@ mod test {
 
         assert_eq!(transition(""), make_error("", Tag));
         assert_eq!(transition(" "), make_error("", Tag));
-        assert_eq!(
-            transition("bz <- bz"),
-            make_error("bz <- bz", Tag)
-        );
+        assert_eq!(transition("bz <- bz"), make_error("bz <- bz", Tag));
         assert_eq!(
             transition("foo becomes bar"),
             make_error("foo becomes bar", Tag)

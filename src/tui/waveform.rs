@@ -70,7 +70,7 @@ impl<'a> Waveform<'a> {
     }
 }
 
-impl<'a> Widget for Waveform<'a> {
+impl Widget for Waveform<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         for (i, elmt) in self.data.iter().enumerate() {
             let fg = if i == self.cursor {
@@ -149,7 +149,7 @@ impl<'a> Widget for Waveform<'a> {
                 };
 
                 buf.get_mut(area.left() + (offset + i + 1) as u16, area.top() + 1)
-                    .set_symbol(&symbol);
+                    .set_symbol(symbol);
             }
         }
 

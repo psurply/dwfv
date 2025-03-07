@@ -6,8 +6,8 @@ use std::io;
 use std::path::Path;
 use termion::input::MouseTerminal;
 use termion::raw::{IntoRawMode, RawTerminal};
-use tui::backend::TermionBackend;
 use tui::Terminal;
+use tui::backend::TermionBackend;
 
 /// Digital Waveform Viewer Text User Interface
 pub struct Tui {
@@ -38,7 +38,7 @@ impl Tui {
     fn render(&mut self) -> Result<(), Box<dyn Error>> {
         let term = &mut self.term;
         let app = &mut self.app;
-        term.draw(|mut f| app.render(&mut f))?;
+        term.draw(|f| app.render(f))?;
         Ok(())
     }
 
